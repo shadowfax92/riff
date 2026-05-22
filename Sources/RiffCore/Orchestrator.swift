@@ -91,6 +91,7 @@ public actor DebateOrchestrator {
             let filesBefore = Set((try store.listMarkdownFiles()).map(\.relativePath))
             let started = now()
             let session = try store.readAgentSession(agentID: agent.id)
+            let contextCursor = max(session.lastContextTurn, transcript.map(\.turn).max() ?? 0)
             onTurnStart(agent, turn)
             defer { onTurnEnd() }
             let turnEvent = onTurnEvent
@@ -102,7 +103,7 @@ public actor DebateOrchestrator {
                         sessionID: session.sessionID,
                         baselinePrompt: baselinePrompt,
                         conversationPrompt: conversation.prompt,
-                        context: composeContext(transcript),
+                        context: composeContext(transcript, for: agent, after: session.lastContextTurn),
                         attachmentPath: attachmentPath
                     ),
                     emit: { event in turnEvent(event) }
@@ -127,7 +128,12 @@ public actor DebateOrchestrator {
                 try store.appendTranscript(entry)
                 transcript.append(entry)
                 try store.writeAgentSession(
-                    AgentSession(sessionID: result.sessionID ?? session.sessionID, model: result.model, lastUsedAt: finished),
+                    AgentSession(
+                        sessionID: result.sessionID ?? session.sessionID,
+                        model: result.model,
+                        lastUsedAt: finished,
+                        lastContextTurn: contextCursor
+                    ),
                     agentID: agent.id
                 )
             } catch {
@@ -177,8 +183,13 @@ public actor DebateOrchestrator {
         )
     }
 
-    private func composeContext(_ transcript: [TranscriptEntry]) -> String {
-        transcript.map { entry in
+    /// Builds the transcript slice for one agent turn. The CLI session already
+    /// carries that agent's own history, so prompts only include newer non-self entries.
+    private func composeContext(_ transcript: [TranscriptEntry], for agent: AgentProfile, after cursor: Int) -> String {
+        transcript.filter { entry in
+            entry.turn > cursor && entry.speakerID != agent.id
+        }
+        .map { entry in
             var line = "\(entry.speakerName): \(entry.text)"
             if !entry.attachments.isEmpty {
                 line += "\nAttachments: " + entry.attachments.map(\.path).joined(separator: ", ")

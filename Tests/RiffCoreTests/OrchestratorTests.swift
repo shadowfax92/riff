@@ -51,6 +51,57 @@ import Testing
     #expect(try store.readAgentSession(agentID: "a2").sessionID == "session-a2")
 }
 
+@Test func agentsReceiveOnlyNewNonSelfContextAfterTheirCursor() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)], maxRounds: 3)
+    let adapter = RecordingAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    _ = try await orchestrator.run()
+
+    let requests = await adapter.requests
+    #expect(requests.count == 6)
+    #expect(requests[0].context.isEmpty)
+    #expect(requests[1].context.contains("turn-001.role-a1.claude.md"))
+    #expect(requests[2].context.contains("turn-002.role-a2.claude.md"))
+    #expect(!requests[2].context.contains("turn-001.role-a1.claude.md"))
+    #expect(requests[3].context.contains("turn-003.role-a1.claude.md"))
+    #expect(!requests[3].context.contains("turn-001.role-a1.claude.md"))
+    #expect(!requests[3].context.contains("turn-002.role-a2.claude.md"))
+    #expect(requests[4].context.contains("turn-004.role-a2.claude.md"))
+    #expect(!requests[4].context.contains("turn-002.role-a2.claude.md"))
+    #expect(!requests[4].context.contains("turn-003.role-a1.claude.md"))
+    #expect(requests[5].context.contains("turn-005.role-a1.claude.md"))
+    #expect(!requests[5].context.contains("turn-003.role-a1.claude.md"))
+    #expect(!requests[5].context.contains("turn-004.role-a2.claude.md"))
+    #expect(try store.readAgentSession(agentID: "a1").lastContextTurn == 4)
+    #expect(try store.readAgentSession(agentID: "a2").lastContextTurn == 5)
+}
+
+@Test func queuedUserMessagesAfterCursorAreDeliveredOnce() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)], maxRounds: 2)
+    try store.appendTranscript(transcriptEntry(turn: 1, speakerID: "a1", speakerName: "Agent a1", text: "old a1"))
+    try store.appendTranscript(transcriptEntry(turn: 2, speakerID: "a2", speakerName: "Agent a2", text: "old a2"))
+    try store.writeAgentSession(AgentSession(sessionID: "session-a1", lastContextTurn: 2), agentID: "a1")
+    let adapter = RecordingAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    await orchestrator.queueUserMessage("fresh guidance")
+    _ = try await orchestrator.run()
+
+    let requests = await adapter.requests
+    #expect(requests.first?.context == "You: fresh guidance")
+}
+
 @Test func createdAndMentionedMarkdownFilesAreLinkedFromTurn() async throws {
     let store = try makeStore(agents: [agent("a1", .claude)])
     let adapter = FileWritingAdapter()
@@ -94,7 +145,11 @@ private actor RecordingAdapter: RuntimeAdapter {
 
     func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void) async throws -> RuntimeTurnResult {
         requests.append(request)
-        return RuntimeTurnResult(text: "response from \(request.agent.id)", sessionID: "session-\(request.agent.id)", model: request.agent.model)
+        return RuntimeTurnResult(
+            text: "response from \(request.agent.id) at \(request.attachmentPath)",
+            sessionID: "session-\(request.agent.id)",
+            model: request.agent.model
+        )
     }
 }
 
@@ -144,16 +199,30 @@ private actor BlockingAdapter: RuntimeAdapter {
     }
 }
 
-private func makeStore(agents: [AgentProfile]) throws -> ConversationStore {
+private func makeStore(agents: [AgentProfile], maxRounds: Int = 1) throws -> ConversationStore {
     let store = ConversationStore(rootURL: try temporaryDirectory())
     try store.create(Conversation(
         id: "c1",
         title: "Debate",
         prompt: "Should we build this?",
-        maxRounds: 1,
+        maxRounds: maxRounds,
         agents: agents
     ))
     return store
+}
+
+private func transcriptEntry(turn: Int, speakerID: String, speakerName: String, text: String) -> TranscriptEntry {
+    TranscriptEntry(
+        id: "t\(turn)",
+        turn: turn,
+        round: 1,
+        speakerID: speakerID,
+        speakerName: speakerName,
+        runtime: .claude,
+        text: text,
+        startedAt: Date(timeIntervalSince1970: TimeInterval(turn)),
+        finishedAt: Date(timeIntervalSince1970: TimeInterval(turn + 1))
+    )
 }
 
 private func temporaryDirectory() throws -> URL {
