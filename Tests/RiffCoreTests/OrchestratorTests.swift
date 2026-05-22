@@ -193,6 +193,37 @@ import Testing
     }
 }
 
+@Test func SummaryGenerationUsesFirstAgentFreshSessionAndFullTranscript() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)])
+    try store.appendTranscript(transcriptEntry(turn: 1, speakerID: "user", speakerName: "You", text: "keep it simple"))
+    try store.appendTranscript(transcriptEntry(turn: 2, speakerID: "a1", speakerName: "Agent a1", text: "first argument"))
+    try store.appendTranscript(transcriptEntry(turn: 3, speakerID: "a2", speakerName: "Agent a2", text: "second argument"))
+    try store.writeAgentSession(AgentSession(sessionID: "existing-session"), agentID: "a1")
+    let adapter = RecordingAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    let summary = try await orchestrator.summarize(summaryPrompt: "summary prompt")
+
+    let requests = await adapter.requests
+    #expect(requests.count == 1)
+    #expect(requests[0].purpose == .summary)
+    #expect(requests[0].agent.id == "a1")
+    #expect(requests[0].sessionID == nil)
+    #expect(requests[0].baselinePrompt == "summary prompt")
+    #expect(requests[0].context.contains("You: keep it simple"))
+    #expect(requests[0].context.contains("Agent a1: first argument"))
+    #expect(requests[0].context.contains("Agent a2: second argument"))
+    #expect(summary?.speakerID == "summary")
+    #expect(summary?.speakerName == "Summary")
+    #expect(summary?.text.hasPrefix("### Summary") == true)
+    #expect(try store.readTranscript().count == 3)
+}
+
 private actor RecordingAdapter: RuntimeAdapter {
     var requests: [RuntimeTurnRequest] = []
 

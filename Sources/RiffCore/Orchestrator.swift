@@ -52,6 +52,51 @@ public actor DebateOrchestrator {
         shouldStop = true
     }
 
+    /// Runs a fresh-session summary pass with the first configured agent
+    /// after a debate has completed. The returned entry is intentionally not
+    /// written to disk; callers decide whether to display it as UI-only state.
+    public func summarize(summaryPrompt: String) async throws -> TranscriptEntry? {
+        let conversation = try store.readConversation()
+        guard let agent = conversation.agents.first else {
+            throw DebateOrchestratorError.noAgents
+        }
+        guard let adapter = adapters[agent.runtime] else {
+            throw DebateOrchestratorError.missingAdapter(agent.runtime)
+        }
+        let transcript = try store.readTranscript()
+        guard !transcript.isEmpty else {
+            return nil
+        }
+
+        let started = now()
+        let result = try await adapter.runTurn(
+            RuntimeTurnRequest(
+                purpose: .summary,
+                agent: agent,
+                conversationRoot: store.rootURL,
+                sessionID: nil,
+                baselinePrompt: summaryPrompt,
+                conversationPrompt: conversation.prompt,
+                context: composeFullContext(transcript),
+                attachmentPath: ""
+            ),
+            emit: onTurnEvent
+        )
+        let finished = now()
+        return TranscriptEntry(
+            id: makeID(),
+            turn: (transcript.map(\.turn).max() ?? 0) + 1,
+            round: 0,
+            speakerID: "summary",
+            speakerName: "Summary",
+            runtime: agent.runtime,
+            text: normalizeSummaryText(result.text),
+            startedAt: started,
+            finishedAt: finished,
+            sessionID: result.sessionID
+        )
+    }
+
     /// Runs the conversation turn loop until all configured rounds complete
     /// or a stop request lands; stop never interrupts an in-flight CLI turn.
     @discardableResult
@@ -207,6 +252,28 @@ public actor DebateOrchestrator {
             return line
         }
         .joined(separator: "\n\n")
+    }
+
+    private func composeFullContext(_ transcript: [TranscriptEntry]) -> String {
+        transcript.map { entry in
+            var line = "\(entry.speakerName): \(entry.text)"
+            if !entry.attachments.isEmpty {
+                line += "\nAttachments: " + entry.attachments.map(\.path).joined(separator: ", ")
+            }
+            return line
+        }
+        .joined(separator: "\n\n")
+    }
+
+    private func normalizeSummaryText(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.hasPrefix("### Summary") else {
+            return trimmed
+        }
+        if trimmed.isEmpty {
+            return "### Summary"
+        }
+        return "### Summary\n\n\(trimmed)"
     }
 
     private func mergedAttachments(parsed: [TranscriptAttachment], filesBefore: Set<String>) throws -> [TranscriptAttachment] {

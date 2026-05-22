@@ -27,6 +27,7 @@ final class AppModel: ObservableObject {
     @Published var selectedFile: ConversationFile?
     @Published var selectedMarkdown = ""
     @Published var basePrompt = ""
+    @Published var summaryPrompt = ""
     @Published var isRunning = false
     @Published var activeTurn: ActiveTurnState?
     @Published var errorMessage: String?
@@ -39,6 +40,7 @@ final class AppModel: ObservableObject {
     private lazy var configStore = ConfigStore(paths: paths)
 
     var basePromptURL: URL { configStore.basePromptURL }
+    var summaryPromptURL: URL { configStore.summaryPromptURL }
     var runtimeSettingsURL: URL { configStore.runtimeSettingsURL }
 
     /// Re-reads the base prompt from disk so the UI shows fresh content
@@ -46,6 +48,16 @@ final class AppModel: ObservableObject {
     func reloadBasePrompt() {
         do {
             basePrompt = try configStore.readBasePrompt()
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
+    /// Re-reads the summary prompt from disk so settings can pick up edits
+    /// made in an external markdown editor.
+    func reloadSummaryPrompt() {
+        do {
+            summaryPrompt = try configStore.readSummaryPrompt()
         } catch {
             errorMessage = String(describing: error)
         }
@@ -60,6 +72,7 @@ final class AppModel: ObservableObject {
         do {
             try configStore.bootstrap()
             basePrompt = try configStore.readBasePrompt()
+            summaryPrompt = try configStore.readSummaryPrompt()
             runtimeSettings = try configStore.readRuntimeSettings()
             detectedRuntimes = await detectRuntimes()
             try reloadRows()
@@ -206,6 +219,7 @@ final class AppModel: ObservableObject {
         }
         isRunning = true
         let store = ConversationStore(rootURL: location.url)
+        let summaryPrompt = summaryPrompt
         let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
         let orchestrator = DebateOrchestrator(
             store: store,
@@ -247,8 +261,16 @@ final class AppModel: ObservableObject {
         )
         runningOrchestrator = orchestrator
         runTask = Task {
+            var completedNaturally = false
+            var summaryEntry: TranscriptEntry?
             do {
-                _ = try await orchestrator.run()
+                let transcript = try await orchestrator.run()
+                if let conversation = try? store.readConversation() {
+                    completedNaturally = self.didComplete(transcript: transcript, conversation: conversation)
+                }
+                if completedNaturally {
+                    summaryEntry = try await orchestrator.summarize(summaryPrompt: summaryPrompt)
+                }
             } catch {
                 await MainActor.run {
                     guard !(error is CancellationError) else {
@@ -263,6 +285,9 @@ final class AppModel: ObservableObject {
                 self.activeTurn = nil
             }
             await self.reloadSelected()
+            if let summaryEntry, self.selectedID == location.id {
+                self.transcript.append(summaryEntry)
+            }
             try? self.reloadRows()
         }
     }
@@ -406,6 +431,11 @@ final class AppModel: ObservableObject {
         }
         reloadSelectedFromDisk()
         try reloadRows()
+    }
+
+    private func didComplete(transcript: [TranscriptEntry], conversation: Conversation) -> Bool {
+        let agentTurns = transcript.filter { $0.speakerID != "user" }.count
+        return agentTurns >= conversation.maxRounds * conversation.agents.count
     }
 
     private func reloadRows() throws {
