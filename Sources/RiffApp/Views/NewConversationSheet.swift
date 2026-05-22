@@ -7,7 +7,7 @@ struct NewConversationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var prompt = ""
-    @State private var maxRounds = 1
+    @State private var maxRounds = 10
     @State private var customFolder: URL?
     @State private var choosingFolder = false
     @State private var roleDrafts = [
