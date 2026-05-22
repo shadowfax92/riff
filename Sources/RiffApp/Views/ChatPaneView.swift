@@ -1,3 +1,4 @@
+import MarkdownUI
 import RiffCore
 import SwiftUI
 
@@ -268,20 +269,14 @@ private struct MessageRow: View {
     }
 
     private var bubble: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
-                Text(paragraph)
-                    .font(.system(size: 14))
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .foregroundStyle(isUser ? .white : .primary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(bubbleColor)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
+        Markdown(entry.error ?? entry.text)
+            .markdownTheme(.bubble(isUser: isUser))
+            .textSelection(.enabled)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(bubbleColor)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
     }
 
     private var bubbleColor: Color {
@@ -289,23 +284,6 @@ private struct MessageRow: View {
             return Color.red.opacity(0.32)
         }
         return isUser ? Theme.Color.userBubble : Theme.Color.agentBubble
-    }
-
-    /// Splits the message on blank lines and parses each paragraph as
-    /// inline markdown — preserves whitespace so `**bold**`, `*italic*`,
-    /// and `` `code` `` render properly inside the bubble.
-    private var paragraphs: [AttributedString] {
-        let text = entry.error ?? entry.text
-        let options = AttributedString.MarkdownParsingOptions(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        )
-        return text.components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .map { paragraph in
-                (try? AttributedString(markdown: paragraph, options: options))
-                    ?? AttributedString(paragraph)
-            }
     }
 
     /// User and error bubbles get no word count — only normal agent turns.

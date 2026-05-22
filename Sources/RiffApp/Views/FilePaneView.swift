@@ -1,3 +1,4 @@
+import MarkdownUI
 import RiffCore
 import SwiftUI
 
@@ -94,7 +95,8 @@ struct FilePaneView: View {
                 Divider().background(Theme.Color.separator)
             }
             ScrollView {
-                MarkdownView(markdown: model.selectedMarkdown)
+                Markdown(model.selectedMarkdown)
+                    .markdownTheme(.gitHub)
                     .padding(16)
             }
         }
