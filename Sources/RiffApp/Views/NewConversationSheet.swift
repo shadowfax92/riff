@@ -1,3 +1,4 @@
+import RiffCore
 import SwiftUI
 
 struct NewConversationSheet: View {
@@ -8,100 +9,292 @@ struct NewConversationSheet: View {
     @State private var maxRounds = 1
     @State private var customFolder: URL?
     @State private var choosingFolder = false
+    @State private var roleDrafts = [
+        RoleDraft(
+            id: UUID().uuidString.lowercased(),
+            roleName: "",
+            rolePrompt: "",
+            runtime: .claude
+        )
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("New Riff")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Title")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Architecture debate", text: $title)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Prompt")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("What should the agents debate?", text: $prompt, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(4...8)
-            }
-
-            Stepper("Rounds: \(maxRounds)", value: $maxRounds, in: 1...12)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Button {
-                        choosingFolder = true
-                    } label: {
-                        Label("Choose Folder", systemImage: "folder")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    fieldGroup(label: "Title") {
+                        styledField {
+                            TextField("Architecture debate", text: $title)
+                                .textFieldStyle(.plain)
+                        }
                     }
-                    if let customFolder {
-                        Text(customFolder.path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    } else {
-                        Text("Default: ~/.riff/conversations/<id>")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Agents from ~/.riff/configs/agents.json")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(model.agents) { agent in
-                    HStack {
-                        Text(agent.name)
-                            .font(.system(size: 13, weight: .medium))
-                        Text(agent.runtime.rawValue)
-                            .font(.system(size: 11, design: .monospaced))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary, in: Capsule())
+                    fieldGroup(label: "Prompt") {
+                        styledField {
+                            TextField("What should the agents debate?", text: $prompt, axis: .vertical)
+                                .textFieldStyle(.plain)
+                                .lineLimit(3...8)
+                        }
+                    }
+
+                    HStack(spacing: 14) {
+                        Stepper("Rounds: \(maxRounds)", value: $maxRounds, in: 1...12)
+                            .controlSize(.small)
                         Spacer()
-                        Text(agent.role)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
+
+                    folderRow
+
+                    rolesSection
                 }
+                .padding(.bottom, 4)
             }
-            .padding(10)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .frame(maxHeight: 560)
+
+            Divider().background(Theme.Color.separator)
 
             HStack {
                 Spacer()
-                Button("Cancel") {
-                    dismiss()
-                }
+                Button("Cancel") { dismiss() }
                 Button("Create") {
                     Task {
                         await model.createConversation(
-                            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Riff" : title,
+                            title: trimmedTitle,
                             prompt: prompt,
                             maxRounds: maxRounds,
-                            customFolder: customFolder
+                            customFolder: customFolder,
+                            roleDrafts: roleDrafts
                         )
                         dismiss()
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.agents.isEmpty)
+                .disabled(!canCreate)
             }
         }
         .padding(22)
-        .frame(width: 560)
+        .frame(width: 640)
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.directory]) { result in
             if case .success(let url) = result {
                 customFolder = url
             }
+        }
+    }
+
+    private func fieldGroup<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func styledField<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.08))
+            )
+    }
+
+    private var folderRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                choosingFolder = true
+            } label: {
+                Label("Choose Folder", systemImage: "folder")
+                    .font(.system(size: 12))
+            }
+            .controlSize(.small)
+            if let customFolder {
+                Text(customFolder.path)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Button {
+                    self.customFolder = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("Default: ~/.riff/conversations/<id>")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private var rolesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Roles")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button {
+                    addRole()
+                } label: {
+                    Label("Add Role", systemImage: "plus")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+            }
+            Text("Base prompt: ~/.riff/configs/prompt.md")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            ForEach($roleDrafts) { $role in
+                RoleEditor(
+                    role: $role,
+                    canDelete: roleDrafts.count > 1,
+                    onDelete: { removeRole(role.id) }
+                )
+            }
+        }
+    }
+
+    private var canCreate: Bool {
+        !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && roleDrafts.contains(where: \.isValid)
+    }
+
+    private var trimmedTitle: String {
+        let cleaned = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "Untitled Riff" : cleaned
+    }
+
+    private func addRole() {
+        let runtime: RuntimeID = roleDrafts.last?.runtime == .claude ? .codex : .claude
+        roleDrafts.append(RoleDraft(
+            id: UUID().uuidString.lowercased(),
+            roleName: "",
+            rolePrompt: "",
+            runtime: runtime,
+            reasoning: runtime == .codex ? "medium" : nil
+        ))
+    }
+
+    private func removeRole(_ id: String) {
+        guard roleDrafts.count > 1 else { return }
+        roleDrafts.removeAll { $0.id == id }
+    }
+}
+
+private struct RoleEditor: View {
+    @Binding var role: RoleDraft
+    let canDelete: Bool
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                AgentAvatar(
+                    initials: AgentAvatar.initials(from: role.roleName.isEmpty ? "?" : role.roleName),
+                    color: Theme.color(forSpeakerID: role.id, runtime: role.runtime),
+                    size: 28
+                )
+                TextField("ROLE_NAME", text: $role.roleName)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.white.opacity(0.08))
+                    )
+                Picker("", selection: $role.runtime) {
+                    ForEach(RuntimeID.allCases) { runtime in
+                        Text(runtime.rawValue.capitalized).tag(runtime)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+                .labelsHidden()
+                if canDelete {
+                    Button {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 10) {
+                fieldWithLabel("Model") {
+                    TextField("default", text: $role.model)
+                        .textFieldStyle(.plain)
+                }
+                fieldWithLabel("Reasoning") {
+                    TextField(role.runtime == .codex ? "medium" : "—", text: reasoningBinding)
+                        .textFieldStyle(.plain)
+                        .disabled(role.runtime != .codex)
+                        .opacity(role.runtime == .codex ? 1 : 0.5)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Role prompt")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                TextField("Make a sharp case for…", text: $role.rolePrompt, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(2...6)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.white.opacity(0.08))
+                    )
+            }
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.06))
+        )
+    }
+
+    private func fieldWithLabel<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+            content()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.white.opacity(0.08))
+                )
+        }
+    }
+
+    private var reasoningBinding: Binding<String> {
+        Binding {
+            role.reasoning ?? ""
+        } set: { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            role.reasoning = trimmed.isEmpty ? nil : value
         }
     }
 }
