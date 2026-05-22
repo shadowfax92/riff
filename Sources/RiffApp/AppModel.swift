@@ -9,6 +9,14 @@ struct ConversationRow: Identifiable, Equatable {
     var preview: String
 }
 
+struct PendingSteer: Equatable {
+    var conversationID: String
+    var messages: [String]
+
+    var count: Int { messages.count }
+    var latestText: String { messages.last ?? "" }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var rows: [ConversationRow] = []
@@ -24,6 +32,8 @@ final class AppModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var detectedRuntimes: [RuntimeID: DetectedRuntime] = [:]
     @Published var runtimeSettings = RuntimeSettings()
+    @Published var pendingSteer: PendingSteer?
+    @Published var isApplyingSteer = false
 
     private let paths = RiffPaths()
     private lazy var configStore = ConfigStore(paths: paths)
@@ -119,37 +129,70 @@ final class AppModel: ObservableObject {
         )
     }
 
-    /// Commits a human-authored message immediately when the debate is idle.
-    /// During a run it queues the text with the orchestrator, which will write
-    /// it at the next safe transcript boundary and trigger a UI reload.
+    /// Commits a human-authored message immediately when idle. During a run,
+    /// stores it as a visible steer request so the user can decide whether to
+    /// interrupt the active agent turn.
     func sendUserMessage(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let location = selectedLocation else {
             return
         }
         do {
-            if isRunning, let runningOrchestrator {
-                Task { await runningOrchestrator.queueUserMessage(trimmed) }
+            if isRunning {
+                queueSteerMessage(trimmed)
                 return
             }
-            let store = ConversationStore(rootURL: location.url)
-            let nextTurn = try store.readTranscript().count + 1
-            let date = Date()
-            try store.appendTranscript(TranscriptEntry(
-                id: UUID().uuidString.lowercased(),
-                turn: nextTurn,
-                round: 0,
-                speakerID: "user",
-                speakerName: "You",
-                text: trimmed,
-                startedAt: date,
-                finishedAt: date
-            ))
-            reloadSelectedFromDisk()
-            try reloadRows()
+            try appendUserMessages([trimmed], to: location)
         } catch {
             errorMessage = String(describing: error)
         }
+    }
+
+    /// Applies queued steer text by cancelling the active agent process,
+    /// writing the human message, and restarting the debate loop from disk.
+    func applyPendingSteer() {
+        guard let pendingSteer, pendingSteer.conversationID == selectedID, !pendingSteer.messages.isEmpty else {
+            return
+        }
+        let messages = pendingSteer.messages
+        self.pendingSteer = nil
+
+        if isRunning, let task = runTask {
+            isApplyingSteer = true
+            task.cancel()
+            Task { @MainActor [weak self] in
+                await task.value
+                guard let self else {
+                    return
+                }
+                guard let location = self.selectedLocation else {
+                    self.isApplyingSteer = false
+                    return
+                }
+                do {
+                    try self.appendUserMessages(messages, to: location)
+                    self.isApplyingSteer = false
+                    self.startSelectedConversation()
+                } catch {
+                    self.isApplyingSteer = false
+                    self.errorMessage = String(describing: error)
+                }
+            }
+        } else if let location = selectedLocation {
+            do {
+                try appendUserMessages(messages, to: location)
+                startSelectedConversation()
+            } catch {
+                errorMessage = String(describing: error)
+            }
+        }
+    }
+
+    func clearPendingSteer() {
+        guard pendingSteer?.conversationID == selectedID else {
+            return
+        }
+        pendingSteer = nil
     }
 
     /// Starts real Claude/Codex turns for the selected conversation using
@@ -205,6 +248,9 @@ final class AppModel: ObservableObject {
                 _ = try await orchestrator.run()
             } catch {
                 await MainActor.run {
+                    guard !(error is CancellationError) else {
+                        return
+                    }
                     self.errorMessage = String(describing: error)
                 }
             }
@@ -324,6 +370,39 @@ final class AppModel: ObservableObject {
         selectedFile = nil
         selectedMarkdown = ""
         activeTurn = nil
+        pendingSteer = nil
+    }
+
+    private func queueSteerMessage(_ text: String) {
+        guard let selectedID else {
+            return
+        }
+        if pendingSteer?.conversationID == selectedID {
+            pendingSteer?.messages.append(text)
+        } else {
+            pendingSteer = PendingSteer(conversationID: selectedID, messages: [text])
+        }
+    }
+
+    private func appendUserMessages(_ messages: [String], to location: ConversationLocation) throws {
+        let store = ConversationStore(rootURL: location.url)
+        var nextTurn = try store.readTranscript().count + 1
+        for message in messages {
+            let date = Date()
+            try store.appendTranscript(TranscriptEntry(
+                id: UUID().uuidString.lowercased(),
+                turn: nextTurn,
+                round: 0,
+                speakerID: "user",
+                speakerName: "You",
+                text: message,
+                startedAt: date,
+                finishedAt: date
+            ))
+            nextTurn += 1
+        }
+        reloadSelectedFromDisk()
+        try reloadRows()
     }
 
     private func reloadRows() throws {

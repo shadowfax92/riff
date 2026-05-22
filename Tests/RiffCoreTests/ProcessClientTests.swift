@@ -38,6 +38,24 @@ import Testing
     #expect(result.exitCode != 0)
 }
 
+@Test func processClientTerminatesCancelledProcesses() async throws {
+    let client = FoundationProcessClient()
+    let start = Date()
+    let task = Task {
+        try await client.run(ProcessInvocation(command: "/bin/sleep", arguments: ["2"]))
+    }
+
+    try await Task.sleep(for: .milliseconds(100))
+    task.cancel()
+
+    do {
+        _ = try await task.value
+        Issue.record("Expected cancellation to throw")
+    } catch is CancellationError {
+        #expect(Date().timeIntervalSince(start) < 1)
+    }
+}
+
 private func processClientTemporaryDirectory() throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appending(path: "riff-process-client-tests-\(UUID().uuidString)", directoryHint: .isDirectory)

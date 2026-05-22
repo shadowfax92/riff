@@ -141,6 +141,9 @@ public actor DebateOrchestrator {
                 )
                 onTurnEnd()
                 await onTranscriptChange()
+            } catch is CancellationError {
+                onTurnEnd()
+                throw CancellationError()
             } catch {
                 let finished = now()
                 let entry = TranscriptEntry(

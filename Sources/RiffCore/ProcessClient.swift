@@ -50,54 +50,154 @@ public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
     }
 
     public func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            if invocation.command.contains("/") {
-                process.executableURL = URL(fileURLWithPath: invocation.command)
-                process.arguments = invocation.arguments
-            } else {
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = [invocation.command] + invocation.arguments
-            }
-            process.currentDirectoryURL = invocation.workingDirectory
-            process.environment = environment
-
-            let stdout = Pipe()
-            let stderr = Pipe()
-            let stdin = Pipe()
-            process.standardOutput = stdout
-            process.standardError = stderr
-            process.standardInput = stdin
-
-            process.terminationHandler = { process in
-                let outputData = stdout.fileHandleForReading.readDataToEndOfFile()
-                let errorData = stderr.fileHandleForReading.readDataToEndOfFile()
-                guard
-                    let output = String(data: outputData, encoding: .utf8),
-                    let error = String(data: errorData, encoding: .utf8)
-                else {
-                    continuation.resume(throwing: ProcessClientError.failedToDecodeOutput)
+        let state = ProcessRunState()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                guard state.begin(continuation) else {
                     return
                 }
-                continuation.resume(returning: ProcessResult(stdout: output, stderr: error, exitCode: process.terminationStatus))
-            }
+                let process = Process()
+                if invocation.command.contains("/") {
+                    process.executableURL = URL(fileURLWithPath: invocation.command)
+                    process.arguments = invocation.arguments
+                } else {
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                    process.arguments = [invocation.command] + invocation.arguments
+                }
+                process.currentDirectoryURL = invocation.workingDirectory
+                process.environment = environment
 
-            do {
-                try process.run()
-                if let timeout = invocation.timeout, timeout > 0 {
-                    DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                        if process.isRunning {
-                            process.terminate()
+                let stdout = Pipe()
+                let stderr = Pipe()
+                let stdin = Pipe()
+                process.standardOutput = stdout
+                process.standardError = stderr
+                process.standardInput = stdin
+
+                process.terminationHandler = { process in
+                    let outputData = stdout.fileHandleForReading.readDataToEndOfFile()
+                    let errorData = stderr.fileHandleForReading.readDataToEndOfFile()
+                    guard
+                        let output = String(data: outputData, encoding: .utf8),
+                        let error = String(data: errorData, encoding: .utf8)
+                    else {
+                        state.finish(.failure(ProcessClientError.failedToDecodeOutput))
+                        return
+                    }
+                    state.finish(.success(ProcessResult(stdout: output, stderr: error, exitCode: process.terminationStatus)))
+                }
+
+                guard state.setProcess(process) else {
+                    return
+                }
+                do {
+                    try process.run()
+                    guard state.processDidStart(process) else {
+                        return
+                    }
+                    if let timeout = invocation.timeout, timeout > 0 {
+                        DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                            if process.isRunning {
+                                process.terminate()
+                            }
                         }
                     }
+                    if let input = invocation.stdin {
+                        stdin.fileHandleForWriting.write(Data(input.utf8))
+                    }
+                    try stdin.fileHandleForWriting.close()
+                } catch {
+                    state.finish(.failure(error))
                 }
-                if let input = invocation.stdin {
-                    stdin.fileHandleForWriting.write(Data(input.utf8))
-                }
-                try stdin.fileHandleForWriting.close()
-            } catch {
-                continuation.resume(throwing: error)
             }
+        } onCancel: {
+            state.cancel()
         }
+    }
+}
+
+private final class ProcessRunState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<ProcessResult, Error>?
+    private var process: Process?
+    private var completed = false
+    private var cancelled = false
+
+    func begin(_ continuation: CheckedContinuation<ProcessResult, Error>) -> Bool {
+        lock.lock()
+        if cancelled {
+            completed = true
+            lock.unlock()
+            continuation.resume(throwing: CancellationError())
+            return false
+        }
+        self.continuation = continuation
+        lock.unlock()
+        return true
+    }
+
+    func setProcess(_ process: Process) -> Bool {
+        lock.lock()
+        if completed || cancelled {
+            lock.unlock()
+            return false
+        }
+        self.process = process
+        lock.unlock()
+        return true
+    }
+
+    func processDidStart(_ process: Process) -> Bool {
+        lock.lock()
+        let shouldCancel = cancelled || completed
+        lock.unlock()
+        if shouldCancel, process.isRunning {
+            process.terminate()
+            return false
+        }
+        return true
+    }
+
+    func finish(_ result: Result<ProcessResult, Error>) {
+        let continuation = takeContinuation(markCompleted: true)
+        continuation?.resume(with: result)
+    }
+
+    func cancel() {
+        lock.lock()
+        guard !completed else {
+            lock.unlock()
+            return
+        }
+        cancelled = true
+        let process = process
+        let continuation = continuation
+        self.continuation = nil
+        self.process = nil
+        if continuation != nil {
+            completed = true
+        }
+        lock.unlock()
+
+        if process?.isRunning == true {
+            process?.terminate()
+        }
+        continuation?.resume(throwing: CancellationError())
+    }
+
+    private func takeContinuation(markCompleted: Bool) -> CheckedContinuation<ProcessResult, Error>? {
+        lock.lock()
+        guard !completed else {
+            lock.unlock()
+            return nil
+        }
+        if markCompleted {
+            completed = true
+        }
+        let continuation = continuation
+        self.continuation = nil
+        process = nil
+        lock.unlock()
+        return continuation
     }
 }

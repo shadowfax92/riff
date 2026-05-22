@@ -176,6 +176,23 @@ import Testing
     #expect(try store.readConversation().status == .stopped)
 }
 
+@Test func cancelledTurnDoesNotAppendErrorTranscriptEntry() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude)])
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: CancellingAdapter()],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    do {
+        _ = try await orchestrator.run()
+        Issue.record("Expected cancellation")
+    } catch is CancellationError {
+        #expect(try store.readTranscript().isEmpty)
+    }
+}
+
 private actor RecordingAdapter: RuntimeAdapter {
     var requests: [RuntimeTurnRequest] = []
 
@@ -215,6 +232,12 @@ private actor MissingFileMentionAdapter: RuntimeAdapter {
             text: "I would use \(request.attachmentPath) if supporting detail were needed.",
             sessionID: "session-\(request.agent.id)"
         )
+    }
+}
+
+private actor CancellingAdapter: RuntimeAdapter {
+    func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void) async throws -> RuntimeTurnResult {
+        throw CancellationError()
     }
 }
 

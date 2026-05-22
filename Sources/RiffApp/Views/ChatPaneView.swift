@@ -11,7 +11,7 @@ struct ChatPaneView: View {
             header
             Divider().background(Theme.Color.separator)
             messages
-            composer
+            composerArea
         }
         .background(Theme.Color.chatBackground)
         .navigationSplitViewColumnWidth(min: 520, ideal: 720)
@@ -107,6 +107,65 @@ struct ChatPaneView: View {
         }
     }
 
+    private var composerArea: some View {
+        VStack(spacing: 8) {
+            steerQueueBar
+            composer
+        }
+    }
+
+    @ViewBuilder
+    private var steerQueueBar: some View {
+        if let pending = selectedPendingSteer {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.triangle.turn.up.right.diamond")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 22, height: 22)
+                    .background(Theme.Color.inputChipBackground)
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(pending.count) steer \(pending.count == 1 ? "message" : "messages") queued")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(pending.latestText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                Spacer(minLength: 10)
+                Button {
+                    model.applyPendingSteer()
+                } label: {
+                    Label("Steer", systemImage: "arrow.turn.down.right")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.borderless)
+                .disabled(model.isApplyingSteer)
+                Button {
+                    model.clearPendingSteer()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .disabled(model.isApplyingSteer)
+                .help("Clear queued steer messages")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Theme.Color.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Theme.Color.cardStroke, lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+        }
+    }
+
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Button {
@@ -149,7 +208,15 @@ struct ChatPaneView: View {
                 .stroke(Theme.Color.inputStroke, lineWidth: 1)
         )
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.top, selectedPendingSteer == nil ? 12 : 0)
+        .padding(.bottom, 12)
+    }
+
+    private var selectedPendingSteer: PendingSteer? {
+        guard let pending = model.pendingSteer, pending.conversationID == model.selectedID else {
+            return nil
+        }
+        return pending
     }
 
     private var sendDisabled: Bool {
