@@ -303,12 +303,21 @@ private struct MessageRow: View {
     @ViewBuilder
     private var avatar: some View {
         if showHeader {
-            AgentAvatar(
-                speakerID: entry.speakerID,
-                speakerName: entry.speakerName,
-                runtime: entry.runtime
-            )
-            .padding(.top, 18)
+            // Prefer the AgentProfile-based init when the speaker matches a
+            // configured agent — it pulls through the emoji and consistent
+            // color. Falls back to the speaker-id form for legacy entries
+            // (e.g., from before emojis existed on AgentProfile).
+            if let agent = model.selectedConversation?.agents.first(where: { $0.id == entry.speakerID }) {
+                AgentAvatar(agent: agent)
+                    .padding(.top, 18)
+            } else {
+                AgentAvatar(
+                    speakerID: entry.speakerID,
+                    speakerName: entry.speakerName,
+                    runtime: entry.runtime
+                )
+                .padding(.top, 18)
+            }
         } else {
             Color.clear.frame(width: Theme.Metric.avatarSize)
         }

@@ -11,14 +11,18 @@ struct NewConversationSheet: View {
     @State private var maxRounds = 10
     @State private var customFolder: URL?
     @State private var choosingFolder = false
-    @State private var roleDrafts = [
-        RoleDraft(
-            id: UUID().uuidString.lowercased(),
-            roleName: RoleNameGenerator.generate(),
-            rolePrompt: "",
-            runtime: .claude
-        )
-    ]
+    @State private var roleDrafts: [RoleDraft] = {
+        let identity = RoleNameGenerator.generate()
+        return [
+            RoleDraft(
+                id: UUID().uuidString.lowercased(),
+                roleName: identity.name,
+                rolePrompt: "",
+                runtime: .claude,
+                emoji: identity.emoji
+            )
+        ]
+    }()
 
     init(onOpenSettings: @escaping () -> Void = {}) {
         self.onOpenSettings = onOpenSettings
@@ -282,12 +286,14 @@ struct NewConversationSheet: View {
 
     private func addRole() {
         let runtime: RuntimeID = roleDrafts.last?.runtime == .claude ? .codex : .claude
+        let identity = RoleNameGenerator.generate()
         roleDrafts.append(RoleDraft(
             id: UUID().uuidString.lowercased(),
-            roleName: RoleNameGenerator.generate(),
+            roleName: identity.name,
             rolePrompt: "",
             runtime: runtime,
-            reasoning: runtime == .codex ? "medium" : nil
+            reasoning: runtime == .codex ? "medium" : nil,
+            emoji: identity.emoji
         ))
     }
 
@@ -310,6 +316,7 @@ private struct RoleEditor: View {
             HStack(spacing: 10) {
                 AgentAvatar(
                     initials: AgentAvatar.initials(from: role.roleName.isEmpty ? "?" : role.roleName),
+                    emoji: role.emoji,
                     color: Theme.color(forSpeakerID: role.id, runtime: role.runtime),
                     size: 28
                 )

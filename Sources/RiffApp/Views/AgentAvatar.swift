@@ -1,10 +1,12 @@
 import RiffCore
 import SwiftUI
 
-/// Circular avatar with one or two letters, tinted by Theme.color(for:).
-/// Used in both the sidebar row and inline next to chat bubbles.
+/// Circular avatar — renders an emoji glyph when the agent has one,
+/// otherwise falls back to up-to-two-letter initials. Tinted by
+/// Theme.color(for:). Used in the sidebar, chat rows, and role editor.
 struct AgentAvatar: View {
     let initials: String
+    var emoji: String? = nil
     let color: Color
     var size: CGFloat = Theme.Metric.avatarSize
 
@@ -12,9 +14,14 @@ struct AgentAvatar: View {
         Circle()
             .fill(color)
             .overlay {
-                Text(initials)
-                    .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                if let emoji, !emoji.isEmpty {
+                    Text(emoji)
+                        .font(.system(size: size * 0.58))
+                } else {
+                    Text(initials)
+                        .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                }
             }
             .frame(width: size, height: size)
     }
@@ -24,14 +31,22 @@ extension AgentAvatar {
     init(agent: AgentProfile, size: CGFloat = Theme.Metric.avatarSize) {
         self.init(
             initials: AgentAvatar.initials(from: agent.name),
+            emoji: agent.emoji,
             color: Theme.color(for: agent),
             size: size
         )
     }
 
-    init(speakerID: String, speakerName: String, runtime: RuntimeID?, size: CGFloat = Theme.Metric.avatarSize) {
+    init(
+        speakerID: String,
+        speakerName: String,
+        runtime: RuntimeID?,
+        emoji: String? = nil,
+        size: CGFloat = Theme.Metric.avatarSize
+    ) {
         self.init(
             initials: AgentAvatar.initials(from: speakerName),
+            emoji: emoji,
             color: Theme.color(forSpeakerID: speakerID, runtime: runtime),
             size: size
         )

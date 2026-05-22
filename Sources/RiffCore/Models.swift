@@ -21,6 +21,7 @@ public struct AgentProfile: Codable, Equatable, Identifiable, Sendable {
     public var model: String
     public var reasoning: String?
     public var instructions: String
+    public var emoji: String?
 
     public init(
         id: String,
@@ -29,7 +30,8 @@ public struct AgentProfile: Codable, Equatable, Identifiable, Sendable {
         runtime: RuntimeID,
         model: String = "default",
         reasoning: String? = nil,
-        instructions: String
+        instructions: String,
+        emoji: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -38,6 +40,7 @@ public struct AgentProfile: Codable, Equatable, Identifiable, Sendable {
         self.model = model
         self.reasoning = reasoning
         self.instructions = instructions
+        self.emoji = emoji
     }
 }
 
@@ -48,6 +51,7 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
     public var runtime: RuntimeID
     public var model: String
     public var reasoning: String?
+    public var emoji: String?
 
     public init(
         id: String,
@@ -55,7 +59,8 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
         rolePrompt: String,
         runtime: RuntimeID,
         model: String = "default",
-        reasoning: String? = nil
+        reasoning: String? = nil,
+        emoji: String? = nil
     ) {
         self.id = id
         self.roleName = roleName
@@ -63,6 +68,7 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
         self.runtime = runtime
         self.model = model
         self.reasoning = reasoning
+        self.emoji = emoji
     }
 
     public var isValid: Bool {
@@ -84,7 +90,8 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
             runtime: runtime,
             model: cleanModel.isEmpty ? "default" : cleanModel,
             reasoning: cleanReasoning?.isEmpty == true ? nil : cleanReasoning,
-            instructions: instructions
+            instructions: instructions,
+            emoji: emoji
         )
     }
 }
