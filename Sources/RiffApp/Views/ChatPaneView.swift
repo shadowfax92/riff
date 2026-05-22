@@ -334,21 +334,30 @@ private struct MessageRow: View {
                     .onTapGesture { Task { await openAttachment(attachment) } }
             }
         }
-        // Agent column fills the row (avatar + full-width bubble).
-        // User column shrinks to the bubble's content width — the row's
-        // leading Spacer pushes it against the right edge.
         .frame(maxWidth: isUser ? nil : .infinity, alignment: isUser ? .trailing : .leading)
     }
 
     private var bubble: some View {
-        Markdown(entry.error ?? entry.text)
-            .markdownTheme(.bubble(isUser: isUser))
+        bubbleContent
             .textSelection(.enabled)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(maxWidth: isUser ? 520 : .infinity, alignment: .leading)
             .background(bubbleColor)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var bubbleContent: some View {
+        if isUser {
+            Text(entry.error ?? entry.text)
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
+                .lineSpacing(2)
+        } else {
+            Markdown(entry.error ?? entry.text)
+                .markdownTheme(.bubble(isUser: false))
+        }
     }
 
     private var bubbleColor: Color {
