@@ -59,11 +59,14 @@ struct ChatPaneView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-        } else {
+        } else if !model.transcript.isEmpty {
+            // Empty chats start themselves when the user sends a first
+            // message, so the Start affordance only appears as a resume
+            // hook for conversations that already have history.
             Button {
                 model.startSelectedConversation()
             } label: {
-                Label("Start", systemImage: "play.fill")
+                Label("Resume", systemImage: "play.fill")
                     .font(.system(size: 12, weight: .medium))
             }
             .buttonStyle(.borderedProminent)

@@ -129,9 +129,11 @@ final class AppModel: ObservableObject {
         )
     }
 
-    /// Commits a human-authored message immediately when idle. During a run,
-    /// stores it as a visible steer request so the user can decide whether to
-    /// interrupt the active agent turn.
+    /// Commits a human-authored message and, when the debate is idle,
+    /// kicks off the agents immediately so the user never has to find a
+    /// separate Start button after sending. During an active run, the
+    /// text becomes a visible steer request so the user can decide
+    /// whether to interrupt the in-flight agent turn.
     func sendUserMessage(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let location = selectedLocation else {
@@ -143,6 +145,7 @@ final class AppModel: ObservableObject {
                 return
             }
             try appendUserMessages([trimmed], to: location)
+            startSelectedConversation()
         } catch {
             errorMessage = String(describing: error)
         }
