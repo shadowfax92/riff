@@ -12,7 +12,7 @@ struct NewConversationSheet: View {
     @State private var roleDrafts = [
         RoleDraft(
             id: UUID().uuidString.lowercased(),
-            roleName: "",
+            roleName: RoleNameGenerator.generate(),
             rolePrompt: "",
             runtime: .claude
         )
@@ -177,7 +177,7 @@ struct NewConversationSheet: View {
         let runtime: RuntimeID = roleDrafts.last?.runtime == .claude ? .codex : .claude
         roleDrafts.append(RoleDraft(
             id: UUID().uuidString.lowercased(),
-            roleName: "",
+            roleName: RoleNameGenerator.generate(),
             rolePrompt: "",
             runtime: runtime,
             reasoning: runtime == .codex ? "medium" : nil
@@ -191,9 +191,12 @@ struct NewConversationSheet: View {
 }
 
 private struct RoleEditor: View {
+    @EnvironmentObject private var model: AppModel
     @Binding var role: RoleDraft
     let canDelete: Bool
     let onDelete: () -> Void
+
+    private static let codexReasoningOptions = ["default", "low", "medium", "high"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -222,6 +225,10 @@ private struct RoleEditor: View {
                 .pickerStyle(.segmented)
                 .frame(width: 160)
                 .labelsHidden()
+                .onChange(of: role.runtime) { _, newRuntime in
+                    role.model = "default"
+                    role.reasoning = newRuntime == .codex ? "medium" : nil
+                }
                 if canDelete {
                     Button {
                         onDelete()
@@ -235,14 +242,24 @@ private struct RoleEditor: View {
 
             HStack(spacing: 10) {
                 fieldWithLabel("Model") {
-                    TextField("default", text: $role.model)
-                        .textFieldStyle(.plain)
+                    Picker("", selection: modelBinding) {
+                        ForEach(modelOptions, id: \.id) { option in
+                            Text(option.label).tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
-                fieldWithLabel("Reasoning") {
-                    TextField(role.runtime == .codex ? "medium" : "—", text: reasoningBinding)
-                        .textFieldStyle(.plain)
-                        .disabled(role.runtime != .codex)
-                        .opacity(role.runtime == .codex ? 1 : 0.5)
+                if role.runtime == .codex {
+                    fieldWithLabel("Reasoning") {
+                        Picker("", selection: reasoningBinding) {
+                            ForEach(Self.codexReasoningOptions, id: \.self) { option in
+                                Text(option.capitalized).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                    }
                 }
             }
 
@@ -278,8 +295,8 @@ private struct RoleEditor: View {
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
             content()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
                 .background(Theme.Color.surfaceOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
@@ -289,12 +306,31 @@ private struct RoleEditor: View {
         }
     }
 
+    /// Prefers live-detected models for this runtime, falls back to the
+    /// hard-coded list in RuntimeDefinitions when detection failed.
+    private var modelOptions: [RuntimeModelOption] {
+        if let detected = model.detectedRuntimes[role.runtime]?.models, !detected.isEmpty {
+            return detected
+        }
+        return RuntimeDefinitions.definition(for: role.runtime).fallbackModels
+    }
+
+    private var modelBinding: Binding<String> {
+        Binding {
+            let current = role.model.trimmingCharacters(in: .whitespacesAndNewlines)
+            if current.isEmpty { return "default" }
+            return modelOptions.contains(where: { $0.id == current }) ? current : "default"
+        } set: { value in
+            role.model = value
+        }
+    }
+
     private var reasoningBinding: Binding<String> {
         Binding {
-            role.reasoning ?? ""
+            let current = role.reasoning?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return current.isEmpty ? "default" : current
         } set: { value in
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            role.reasoning = trimmed.isEmpty ? nil : value
+            role.reasoning = value == "default" ? nil : value
         }
     }
 }
