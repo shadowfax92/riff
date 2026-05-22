@@ -11,6 +11,10 @@ public struct ConfigStore: Sendable {
         paths.configURL.appending(path: "base_prompt.md")
     }
 
+    public var summaryPromptURL: URL {
+        paths.configURL.appending(path: "summarise_prompt.md")
+    }
+
     public var recentConversationsURL: URL {
         paths.configURL.appending(path: "recent-conversations.json")
     }
@@ -31,6 +35,9 @@ public struct ConfigStore: Sendable {
         if !fm.fileExists(atPath: basePromptURL.path) {
             try Self.defaultPrompt.write(to: basePromptURL, atomically: true, encoding: .utf8)
         }
+        if !fm.fileExists(atPath: summaryPromptURL.path) {
+            try Self.defaultSummaryPrompt.write(to: summaryPromptURL, atomically: true, encoding: .utf8)
+        }
         if !fm.fileExists(atPath: recentConversationsURL.path) {
             try RiffJSON.write([ConversationLocation](), to: recentConversationsURL)
         }
@@ -43,10 +50,20 @@ public struct ConfigStore: Sendable {
         try String(contentsOf: basePromptURL, encoding: .utf8)
     }
 
+    public func readSummaryPrompt() throws -> String {
+        try String(contentsOf: summaryPromptURL, encoding: .utf8)
+    }
+
     /// Persists the shared baseline prompt used when building future agent
     /// prompts from the app's config editor.
     public func writeBasePrompt(_ prompt: String) throws {
         try RiffJSON.writeText(prompt, to: basePromptURL)
+    }
+
+    /// Persists the prompt used by the fresh-session summary pass after a
+    /// debate reaches its configured end.
+    public func writeSummaryPrompt(_ prompt: String) throws {
+        try RiffJSON.writeText(prompt, to: summaryPromptURL)
     }
 
     public func readRuntimeSettings() throws -> RuntimeSettings {
@@ -116,5 +133,28 @@ public struct ConfigStore: Sendable {
     - Stay on the user's question.
 
     If you need supporting detail beyond the chat argument, write it to the provided markdown attachment path using your file tools, then mention that relative path in your response. Do not paste long appendices into the chat bubble.
+    """
+
+    public static let defaultSummaryPrompt = """
+    # Riff Debate Summary
+
+    Write a concise human-readable summary of the full debate.
+
+    Start the response with exactly:
+    ### Summary
+
+    Cover:
+    - The user's original question.
+    - Each side's strongest arguments.
+    - The most important objections and concessions.
+    - Where the debate ended up.
+    - Any open questions that still matter.
+
+    Style:
+    - Simple, elegant, and concise.
+    - Clear enough for a thoughtful non-specialist.
+    - Explain in 110-120 IQ communication: direct, plain, not dumbed down.
+    - Prefer short sections and bullets when useful.
+    - Do not add new arguments that were not in the conversation.
     """
 }

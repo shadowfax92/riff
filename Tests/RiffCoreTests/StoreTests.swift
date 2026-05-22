@@ -47,6 +47,30 @@ import Testing
     #expect(try store.readBasePrompt() == "updated prompt")
 }
 
+@Test func bootstrapCreatesSummaryPromptWithoutOverwritingCustomPrompt() throws {
+    let root = try temporaryDirectory()
+    let paths = RiffPaths(homeURL: root)
+    let store = ConfigStore(paths: paths)
+
+    try store.bootstrap()
+    try "custom summary".write(to: store.summaryPromptURL, atomically: true, encoding: .utf8)
+    try store.bootstrap()
+
+    #expect(store.summaryPromptURL.lastPathComponent == "summarise_prompt.md")
+    #expect(try store.readSummaryPrompt() == "custom summary")
+}
+
+@Test func writeSummaryPromptPersistsPrompt() throws {
+    let root = try temporaryDirectory()
+    let paths = RiffPaths(homeURL: root)
+    let store = ConfigStore(paths: paths)
+
+    try store.bootstrap()
+    try store.writeSummaryPrompt("updated summary")
+
+    #expect(try store.readSummaryPrompt() == "updated summary")
+}
+
 @Test func creatingConversationWritesExpectedLayout() throws {
     let root = try temporaryDirectory().appending(path: "conversation", directoryHint: .isDirectory)
     let store = ConversationStore(rootURL: root)
