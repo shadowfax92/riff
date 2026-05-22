@@ -5,7 +5,7 @@ import Testing
 @Test func defaultPathsResolveUnderRiffRoot() {
     let paths = RiffPaths(homeURL: URL(fileURLWithPath: "/tmp/home", isDirectory: true))
 
-    #expect(paths.configsURL.path == "/tmp/home/.riff/configs")
+    #expect(paths.configURL.path == "/tmp/home/.riff/config")
     #expect(paths.conversationsURL.path == "/tmp/home/.riff/conversations")
 }
 

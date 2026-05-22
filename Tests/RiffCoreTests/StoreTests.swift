@@ -8,11 +8,26 @@ import Testing
     let store = ConfigStore(paths: paths)
 
     try store.bootstrap()
-    try "custom prompt".write(to: store.promptURL, atomically: true, encoding: .utf8)
+    try "custom prompt".write(to: store.basePromptURL, atomically: true, encoding: .utf8)
     try store.bootstrap()
 
     #expect(try store.readBasePrompt() == "custom prompt")
-    #expect(!FileManager.default.fileExists(atPath: paths.configsURL.appending(path: "agents.json").path))
+    #expect(!FileManager.default.fileExists(atPath: paths.configURL.appending(path: "agents.json").path))
+}
+
+@Test func bootstrapMigratesLegacyConfigsDirectory() throws {
+    let root = try temporaryDirectory()
+    let paths = RiffPaths(homeURL: root)
+    let fm = FileManager.default
+    try fm.createDirectory(at: paths.legacyConfigsURL, withIntermediateDirectories: true)
+    let legacyPrompt = paths.legacyConfigsURL.appending(path: "prompt.md")
+    try "legacy prompt".write(to: legacyPrompt, atomically: true, encoding: .utf8)
+
+    try ConfigStore(paths: paths).bootstrap()
+
+    #expect(!fm.fileExists(atPath: paths.legacyConfigsURL.path))
+    #expect(fm.fileExists(atPath: paths.configURL.appending(path: "base_prompt.md").path))
+    #expect(try ConfigStore(paths: paths).readBasePrompt() == "legacy prompt")
 }
 
 @Test func creatingConversationWritesExpectedLayout() throws {

@@ -11,7 +11,13 @@ public struct RiffPaths: Equatable, Sendable {
         homeURL.appending(path: ".riff", directoryHint: .isDirectory)
     }
 
-    public var configsURL: URL {
+    public var configURL: URL {
+        rootURL.appending(path: "config", directoryHint: .isDirectory)
+    }
+
+    /// Pre-rename directory location, kept so bootstrap can migrate users
+    /// who already have a populated `~/.riff/configs` tree.
+    public var legacyConfigsURL: URL {
         rootURL.appending(path: "configs", directoryHint: .isDirectory)
     }
 

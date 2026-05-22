@@ -1,3 +1,4 @@
+import AppKit
 import RiffCore
 import SwiftUI
 
@@ -47,6 +48,8 @@ struct NewConversationSheet: View {
                     }
 
                     folderRow
+
+                    basePromptRow
 
                     rolesSection
                 }
@@ -136,6 +139,69 @@ struct NewConversationSheet: View {
         }
     }
 
+    private var basePromptRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: "doc.text")
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Base prompt")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(displayPath(model.basePromptURL))
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Button {
+                    NSWorkspace.shared.open(model.basePromptURL)
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([model.basePromptURL])
+                } label: {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Show in Finder")
+                Button {
+                    model.reloadBasePrompt()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Reload from disk")
+            }
+            DisclosureGroup("Preview") {
+                ScrollView {
+                    Text(model.basePrompt)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .padding(10)
+                }
+                .frame(maxHeight: 160)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .font(.system(size: 11))
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
+    }
+
     private var rolesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -150,9 +216,6 @@ struct NewConversationSheet: View {
                 }
                 .controlSize(.small)
             }
-            Text("Base prompt: ~/.riff/configs/prompt.md")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             ForEach($roleDrafts) { $role in
                 RoleEditor(
                     role: $role,
@@ -161,6 +224,15 @@ struct NewConversationSheet: View {
                 )
             }
         }
+    }
+
+    private func displayPath(_ url: URL) -> String {
+        let path = url.path
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
     }
 
     private var canCreate: Bool {

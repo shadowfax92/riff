@@ -25,6 +25,18 @@ final class AppModel: ObservableObject {
 
     private let paths = RiffPaths()
     private lazy var configStore = ConfigStore(paths: paths)
+
+    var basePromptURL: URL { configStore.basePromptURL }
+
+    /// Re-reads the base prompt from disk so the UI shows fresh content
+    /// after the user opens and edits the markdown file externally.
+    func reloadBasePrompt() {
+        do {
+            basePrompt = try configStore.readBasePrompt()
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
     private var selectedLocation: ConversationLocation?
     private var runningOrchestrator: DebateOrchestrator?
     private var runTask: Task<Void, Never>?

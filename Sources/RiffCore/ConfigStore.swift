@@ -7,29 +7,33 @@ public struct ConfigStore: Sendable {
         self.paths = paths
     }
 
-    public var promptURL: URL {
-        paths.configsURL.appending(path: "prompt.md")
+    public var basePromptURL: URL {
+        paths.configURL.appending(path: "base_prompt.md")
     }
 
     public var recentConversationsURL: URL {
-        paths.configsURL.appending(path: "recent-conversations.json")
+        paths.configURL.appending(path: "recent-conversations.json")
     }
 
     /// Creates the baseline Riff config files used by new debates while
-    /// preserving the user-edited shared prompt.
+    /// preserving the user-edited shared prompt. Also migrates the old
+    /// `~/.riff/configs/prompt.md` layout into `~/.riff/config/base_prompt.md`
+    /// so users who customized the prior file don't lose their edits.
     public func bootstrap() throws {
-        try FileManager.default.createDirectory(at: paths.configsURL, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: paths.conversationsURL, withIntermediateDirectories: true)
-        if !FileManager.default.fileExists(atPath: promptURL.path) {
-            try Self.defaultPrompt.write(to: promptURL, atomically: true, encoding: .utf8)
+        let fm = FileManager.default
+        try migrateLegacyLayout()
+        try fm.createDirectory(at: paths.configURL, withIntermediateDirectories: true)
+        try fm.createDirectory(at: paths.conversationsURL, withIntermediateDirectories: true)
+        if !fm.fileExists(atPath: basePromptURL.path) {
+            try Self.defaultPrompt.write(to: basePromptURL, atomically: true, encoding: .utf8)
         }
-        if !FileManager.default.fileExists(atPath: recentConversationsURL.path) {
+        if !fm.fileExists(atPath: recentConversationsURL.path) {
             try RiffJSON.write([ConversationLocation](), to: recentConversationsURL)
         }
     }
 
     public func readBasePrompt() throws -> String {
-        try String(contentsOf: promptURL, encoding: .utf8)
+        try String(contentsOf: basePromptURL, encoding: .utf8)
     }
 
     public func readRecentConversations() throws -> [ConversationLocation] {
@@ -44,6 +48,19 @@ public struct ConfigStore: Sendable {
         locations.removeAll { $0.id == location.id || $0.url == location.url }
         locations.insert(location, at: 0)
         try RiffJSON.write(locations, to: recentConversationsURL)
+    }
+
+    private func migrateLegacyLayout() throws {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: paths.legacyConfigsURL.path),
+           !fm.fileExists(atPath: paths.configURL.path) {
+            try fm.moveItem(at: paths.legacyConfigsURL, to: paths.configURL)
+        }
+        let legacyPrompt = paths.configURL.appending(path: "prompt.md")
+        if fm.fileExists(atPath: legacyPrompt.path),
+           !fm.fileExists(atPath: basePromptURL.path) {
+            try fm.moveItem(at: legacyPrompt, to: basePromptURL)
+        }
     }
 
     public static let defaultPrompt = """
