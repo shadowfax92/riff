@@ -168,20 +168,6 @@ struct ChatPaneView: View {
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            Button {
-                // Reserved for attachment picker.
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
-                    .background(Theme.Color.inputChipBackground)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(true)
-            .padding(.bottom, 2)
-
             TextField("Message agents", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
