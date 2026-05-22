@@ -97,11 +97,11 @@ struct NewConversationSheet: View {
         content()
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Color.white.opacity(0.05))
+            .background(Theme.Color.surfaceOverlay)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.white.opacity(0.08))
+                    .stroke(Theme.Color.surfaceStroke)
             )
     }
 
@@ -208,11 +208,11 @@ private struct RoleEditor: View {
                     .font(.system(size: 13, weight: .medium))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(Color.white.opacity(0.05))
+                    .background(Theme.Color.surfaceOverlay)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color.white.opacity(0.08))
+                            .stroke(Theme.Color.surfaceStroke)
                     )
                 Picker("", selection: $role.runtime) {
                     ForEach(RuntimeID.allCases) { runtime in
@@ -255,20 +255,20 @@ private struct RoleEditor: View {
                     .lineLimit(2...6)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(Color.white.opacity(0.05))
+                    .background(Theme.Color.surfaceOverlay)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color.white.opacity(0.08))
+                            .stroke(Theme.Color.surfaceStroke)
                     )
             }
         }
         .padding(12)
-        .background(Color.white.opacity(0.04))
+        .background(Theme.Color.surfaceOverlay)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.white.opacity(0.06))
+                .stroke(Theme.Color.surfaceStroke)
         )
     }
 
@@ -280,11 +280,11 @@ private struct RoleEditor: View {
             content()
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(Color.white.opacity(0.05))
+                .background(Theme.Color.surfaceOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.white.opacity(0.08))
+                        .stroke(Theme.Color.surfaceStroke)
                 )
         }
     }

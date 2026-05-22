@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct RiffApp: App {
     @StateObject private var model = AppModel()
+    @AppStorage("riff.appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
 
     var body: some Scene {
         WindowGroup("Riff") {
@@ -10,7 +11,7 @@ struct RiffApp: App {
                 .environmentObject(model)
                 .task { await model.bootstrap() }
                 .frame(minWidth: 1100, minHeight: 700)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(appearance.colorScheme)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -23,6 +24,10 @@ struct RiffApp: App {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+    }
+
+    private var appearance: AppearanceMode {
+        AppearanceMode(rawValue: appearanceRaw) ?? .system
     }
 }
 

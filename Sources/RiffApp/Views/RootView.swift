@@ -5,25 +5,14 @@ struct RootView: View {
     @State private var showingNewConversation = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("riff.showFilesPane") private var showFilesPane = true
+    @AppStorage("riff.appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(showingNewConversation: $showingNewConversation)
         } content: {
             ChatPaneView()
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                showFilesPane.toggle()
-                            }
-                        } label: {
-                            Image(systemName: showFilesPane ? "sidebar.right" : "sidebar.right")
-                                .foregroundStyle(showFilesPane ? Color.accentColor : .secondary)
-                        }
-                        .help(showFilesPane ? "Hide Artifacts" : "Show Artifacts")
-                    }
-                }
+                .toolbar { chatToolbar }
         } detail: {
             if showFilesPane {
                 FilePaneView()
@@ -48,5 +37,37 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .riffNewConversation)) { _ in
             showingNewConversation = true
         }
+    }
+
+    @ToolbarContentBuilder
+    private var chatToolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                cycleAppearance()
+            } label: {
+                Image(systemName: appearance.iconName)
+                    .foregroundStyle(.secondary)
+            }
+            .help("Appearance: \(appearance.label)")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    showFilesPane.toggle()
+                }
+            } label: {
+                Image(systemName: "sidebar.right")
+                    .foregroundStyle(showFilesPane ? Color.accentColor : .secondary)
+            }
+            .help(showFilesPane ? "Hide Artifacts" : "Show Artifacts")
+        }
+    }
+
+    private var appearance: AppearanceMode {
+        AppearanceMode(rawValue: appearanceRaw) ?? .system
+    }
+
+    private func cycleAppearance() {
+        appearanceRaw = appearance.next.rawValue
     }
 }

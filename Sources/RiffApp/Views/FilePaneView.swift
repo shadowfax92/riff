@@ -130,7 +130,7 @@ private struct FileCardRow: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
-                .background(Color.white.opacity(0.04))
+                .background(Theme.Color.surfaceOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)

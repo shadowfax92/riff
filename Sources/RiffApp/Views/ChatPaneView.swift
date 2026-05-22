@@ -106,43 +106,46 @@ struct ChatPaneView: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        HStack(alignment: .bottom, spacing: 8) {
             Button {
-                // Hook for future attachment / folder picker.
+                // Reserved for attachment picker.
             } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 24))
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .background(Theme.Color.surfaceOverlay)
+                    .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .disabled(true)
-            .opacity(0.5)
+            .padding(.bottom, 2)
 
-            HStack(alignment: .bottom, spacing: 8) {
-                TextField("Message agents", text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(1...6)
-                    .font(.system(size: 14))
-                    .onSubmit { send() }
-                Button {
-                    send()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(sendDisabled ? Color.secondary.opacity(0.5) : Color.accentColor)
-                }
-                .buttonStyle(.plain)
-                .disabled(sendDisabled)
+            TextField("Message agents", text: $draft, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...6)
+                .font(.system(size: 14))
+                .onSubmit { send() }
+
+            Button {
+                send()
+            } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(sendDisabled ? Color.secondary.opacity(0.5) : Color.accentColor)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color.white.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
+            .buttonStyle(.plain)
+            .disabled(sendDisabled)
+            .padding(.bottom, 1)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke, lineWidth: 1)
+        )
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
@@ -173,7 +176,7 @@ private struct ParticipantChip: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Color.white.opacity(0.05))
+        .background(Theme.Color.surfaceOverlay)
         .clipShape(Capsule())
     }
 }
@@ -304,7 +307,7 @@ private struct AttachmentCard: View {
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
-                .background(Color.white.opacity(0.05))
+                .background(Theme.Color.surfaceOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(filename)
@@ -319,7 +322,7 @@ private struct AttachmentCard: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color.white.opacity(0.08))
+                .background(Theme.Color.surfaceOverlay)
                 .clipShape(Capsule())
         }
         .padding(.horizontal, 10)

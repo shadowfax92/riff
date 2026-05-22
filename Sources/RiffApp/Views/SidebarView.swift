@@ -48,7 +48,7 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(Color.white.opacity(0.06))
+        .background(Theme.Color.surfaceOverlay)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding(.horizontal, 12)
         .padding(.bottom, 10)
