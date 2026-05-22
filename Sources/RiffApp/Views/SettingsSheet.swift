@@ -38,14 +38,6 @@ struct SettingsSheet: View {
                 .controlSize(.small)
 
                 Button {
-                    basePrompt = ConfigStore.defaultPrompt
-                } label: {
-                    Label("Default Prompt", systemImage: "doc.badge.arrow.up")
-                        .font(.system(size: 12))
-                }
-                .controlSize(.small)
-
-                Button {
                     NSWorkspace.shared.activateFileViewerSelecting([model.runtimeSettingsURL])
                 } label: {
                     Label("Config", systemImage: "folder")
