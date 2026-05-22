@@ -2,6 +2,68 @@ import MarkdownUI
 import SwiftUI
 
 extension MarkdownUI.Theme {
+    /// Compact markdown theme for settings previews, where content should
+    /// read like a document without taking over the modal.
+    static let settingsPreview = MarkdownUI.Theme()
+        .text {
+            FontSize(12)
+            ForegroundColor(.primary)
+        }
+        .strong { FontWeight(.semibold) }
+        .emphasis { FontStyle(.italic) }
+        .code {
+            FontFamilyVariant(.monospaced)
+            FontSize(.em(0.9))
+            BackgroundColor(.gray.opacity(0.18))
+        }
+        .link {
+            ForegroundColor(.accentColor)
+            UnderlineStyle(.single)
+        }
+        .paragraph { configuration in
+            configuration.label
+                .relativeLineSpacing(.em(0.16))
+                .markdownMargin(top: 0, bottom: 8)
+        }
+        .heading1 { configuration in
+            configuration.label
+                .markdownMargin(top: 0, bottom: 8)
+                .markdownTextStyle {
+                    FontSize(.em(1.25))
+                    FontWeight(.semibold)
+                }
+        }
+        .heading2 { configuration in
+            configuration.label
+                .markdownMargin(top: 6, bottom: 6)
+                .markdownTextStyle {
+                    FontSize(.em(1.14))
+                    FontWeight(.semibold)
+                }
+        }
+        .heading3 { configuration in
+            configuration.label
+                .markdownMargin(top: 4, bottom: 4)
+                .markdownTextStyle {
+                    FontSize(.em(1.05))
+                    FontWeight(.semibold)
+                }
+        }
+        .listItem { configuration in
+            configuration.label
+                .markdownMargin(top: .em(0.12))
+        }
+        .codeBlock { configuration in
+            configuration.label
+                .padding(8)
+                .background(.gray.opacity(0.16))
+                .cornerRadius(6)
+                .markdownTextStyle {
+                    FontFamilyVariant(.monospaced)
+                    FontSize(.em(0.88))
+                }
+        }
+
     /// Tight markdown theme for chat bubbles. Tones down heading sizes so
     /// `# Heading` text in an agent's output doesn't dominate the bubble,
     /// and switches base/link colors based on whether the bubble is the

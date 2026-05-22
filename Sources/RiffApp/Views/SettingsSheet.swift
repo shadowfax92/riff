@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownUI
 import RiffCore
 import SwiftUI
 
@@ -94,11 +95,12 @@ struct SettingsSheet: View {
                 .buttonStyle(.borderless)
                 .help("Reload from disk")
             }
-            TextEditor(text: $basePrompt)
-                .font(.system(size: 11, design: .monospaced))
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+            ScrollView {
+                Markdown(basePrompt)
+                    .markdownTheme(.settingsPreview)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
                 .frame(minHeight: 180, maxHeight: 240)
                 .background(Theme.Color.surfaceOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
