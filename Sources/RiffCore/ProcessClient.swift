@@ -34,7 +34,7 @@ public struct ProcessResult: Equatable, Sendable {
     }
 }
 
-public protocol ProcessClient {
+public protocol ProcessClient: Sendable {
     func run(_ invocation: ProcessInvocation) async throws -> ProcessResult
 }
 
@@ -42,7 +42,7 @@ public enum ProcessClientError: Error, Equatable {
     case failedToDecodeOutput
 }
 
-public final class FoundationProcessClient: ProcessClient {
+public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
     public init() {}
 
     public func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {

@@ -1,12 +1,10 @@
 import Foundation
 
-public struct ConfigStore {
+public struct ConfigStore: Sendable {
     public let paths: RiffPaths
-    private let fileManager: FileManager
 
-    public init(paths: RiffPaths = RiffPaths(), fileManager: FileManager = .default) {
+    public init(paths: RiffPaths = RiffPaths()) {
         self.paths = paths
-        self.fileManager = fileManager
     }
 
     public var promptURL: URL {
@@ -24,15 +22,15 @@ public struct ConfigStore {
     /// Creates the baseline Riff config files used by new debates while
     /// preserving any user-edited prompt or agent profiles.
     public func bootstrap() throws {
-        try fileManager.createDirectory(at: paths.configsURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: paths.conversationsURL, withIntermediateDirectories: true)
-        if !fileManager.fileExists(atPath: promptURL.path) {
+        try FileManager.default.createDirectory(at: paths.configsURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: paths.conversationsURL, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: promptURL.path) {
             try Self.defaultPrompt.write(to: promptURL, atomically: true, encoding: .utf8)
         }
-        if !fileManager.fileExists(atPath: agentsURL.path) {
+        if !FileManager.default.fileExists(atPath: agentsURL.path) {
             try RiffJSON.write(Self.defaultAgents, to: agentsURL)
         }
-        if !fileManager.fileExists(atPath: recentConversationsURL.path) {
+        if !FileManager.default.fileExists(atPath: recentConversationsURL.path) {
             try RiffJSON.write([ConversationLocation](), to: recentConversationsURL)
         }
     }
@@ -46,7 +44,7 @@ public struct ConfigStore {
     }
 
     public func readRecentConversations() throws -> [ConversationLocation] {
-        if !fileManager.fileExists(atPath: recentConversationsURL.path) {
+        if !FileManager.default.fileExists(atPath: recentConversationsURL.path) {
             return []
         }
         return try RiffJSON.read([ConversationLocation].self, from: recentConversationsURL)

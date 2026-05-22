@@ -45,15 +45,15 @@ public struct RuntimeTurnResult: Equatable, Sendable {
     }
 }
 
-public protocol RuntimeAdapter {
-    func runTurn(_ request: RuntimeTurnRequest, emit: @escaping (RuntimeEvent) -> Void) async throws -> RuntimeTurnResult
+public protocol RuntimeAdapter: Sendable {
+    func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void) async throws -> RuntimeTurnResult
 }
 
 public enum RuntimeAdapterError: Error, Equatable {
     case processFailed(command: String, exitCode: Int32, stderr: String)
 }
 
-public final class CLIRuntimeAdapter: RuntimeAdapter {
+public final class CLIRuntimeAdapter: RuntimeAdapter, @unchecked Sendable {
     private let definition: RuntimeDefinition
     private let processClient: ProcessClient
 
@@ -62,7 +62,7 @@ public final class CLIRuntimeAdapter: RuntimeAdapter {
         self.processClient = processClient
     }
 
-    public func runTurn(_ request: RuntimeTurnRequest, emit: @escaping (RuntimeEvent) -> Void = { _ in }) async throws -> RuntimeTurnResult {
+    public func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void = { _ in }) async throws -> RuntimeTurnResult {
         let stdin = RuntimePromptBuilder.prompt(for: request, includeInstructions: request.sessionID == nil)
         let invocation = definition.buildInvocation(RuntimeInvocationRequest(
             sessionID: request.sessionID,

@@ -1,12 +1,10 @@
 import Foundation
 
-public struct ConversationStore {
+public struct ConversationStore: Sendable {
     public let rootURL: URL
-    private let fileManager: FileManager
 
-    public init(rootURL: URL, fileManager: FileManager = .default) {
+    public init(rootURL: URL) {
         self.rootURL = rootURL
-        self.fileManager = fileManager
     }
 
     public var conversationURL: URL {
@@ -40,15 +38,15 @@ public struct ConversationStore {
     /// Creates the complete on-disk layout for a conversation, including
     /// shared files and per-agent state directories.
     public func create(_ conversation: Conversation) throws {
-        try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: filesURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: agentsURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: filesURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: agentsURL, withIntermediateDirectories: true)
         for agent in conversation.agents {
-            try fileManager.createDirectory(at: agentCWD(agentID: agent.id), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: agentCWD(agentID: agent.id), withIntermediateDirectories: true)
             try RiffJSON.write(agent, to: agentDirectory(agentID: agent.id).appending(path: "agent.json"))
         }
-        if !fileManager.fileExists(atPath: transcriptURL.path) {
-            fileManager.createFile(atPath: transcriptURL.path, contents: Data())
+        if !FileManager.default.fileExists(atPath: transcriptURL.path) {
+            FileManager.default.createFile(atPath: transcriptURL.path, contents: Data())
         }
         try RiffJSON.write(conversation, to: conversationURL)
     }
@@ -62,7 +60,7 @@ public struct ConversationStore {
     }
 
     public func appendTranscript(_ entry: TranscriptEntry) throws {
-        try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         let data = try RiffJSON.lineData(entry)
         let handle = try FileHandle(forWritingTo: transcriptURL)
         defer {
@@ -74,7 +72,7 @@ public struct ConversationStore {
     }
 
     public func readTranscript() throws -> [TranscriptEntry] {
-        if !fileManager.fileExists(atPath: transcriptURL.path) {
+        if !FileManager.default.fileExists(atPath: transcriptURL.path) {
             return []
         }
         let text = try String(contentsOf: transcriptURL, encoding: .utf8)
@@ -85,7 +83,7 @@ public struct ConversationStore {
 
     public func readAgentSession(agentID: String) throws -> AgentSession {
         let url = agentSessionURL(agentID: agentID)
-        if !fileManager.fileExists(atPath: url.path) {
+        if !FileManager.default.fileExists(atPath: url.path) {
             return AgentSession()
         }
         return try RiffJSON.read(AgentSession.self, from: url)
@@ -110,10 +108,10 @@ public struct ConversationStore {
     }
 
     public func listMarkdownFiles() throws -> [ConversationFile] {
-        if !fileManager.fileExists(atPath: filesURL.path) {
+        if !FileManager.default.fileExists(atPath: filesURL.path) {
             return []
         }
-        let urls = fileManager.enumerator(
+        let urls = FileManager.default.enumerator(
             at: filesURL,
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey]
         )?.compactMap { $0 as? URL } ?? []
@@ -134,7 +132,7 @@ public struct ConversationStore {
     }
 
     public func markdownExists(relativePath: String) -> Bool {
-        (try? safeRelativeURL(relativePath)).map { fileManager.fileExists(atPath: $0.path) } ?? false
+        (try? safeRelativeURL(relativePath)).map { FileManager.default.fileExists(atPath: $0.path) } ?? false
     }
 
     private func safeRelativeURL(_ relativePath: String) throws -> URL {
