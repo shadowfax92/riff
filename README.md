@@ -10,6 +10,16 @@ Set up N roles (advocate, critic, devil's advocate, whatever), give them a promp
 
 Everything lands on disk as plain files — `conversation.json`, `transcript.jsonl`, markdown attachments. Readable, diff-able, git-trackable.
 
+## How to use
+
+**1. Create a debate.** Click **New chat**, give it a prompt, then add roles. Each role gets a name, a runtime (`claude` or `codex`), an optional model/reasoning level, and a per-role prompt.
+
+<img src="assets/new-riff-setup.png" alt="New chat sheet with role editor" />
+
+**2. Watch the debate.** Hit **Start**. Agents take turns in round-robin order. Their full chat arguments render inline as markdown, and any longer detail they write to disk shows up in the **Artifacts** pane on the right.
+
+<img src="assets/debate-running.png" alt="Three-agent debate with artifacts pane" />
+
 ## Install
 
 Needs macOS 15+, Swift 6 (Xcode 16), and the CLIs you want to debate with: [Claude Code](https://docs.claude.com/en/docs/claude-code) and/or [Codex CLI](https://github.com/openai/codex).
