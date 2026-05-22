@@ -11,7 +11,10 @@ SHORT_VERSION := 0.1.0
 BIN_PATH := .build/$(CONFIG)/$(APP_NAME)
 SHELL := /bin/bash
 
-.PHONY: all build app icon install open test clean
+DMG_PATH := $(APP_NAME)-$(SHORT_VERSION).dmg
+DMG_STAGING := .build/dmg-staging
+
+.PHONY: all build app icon install open dmg test clean
 
 all: build
 
@@ -83,8 +86,24 @@ install: app
 open: app
 	open "$(APP_BUNDLE)"
 
+dmg: app
+	@set -euo pipefail; \
+	echo "→ staging $(DMG_PATH)"; \
+	rm -rf "$(DMG_STAGING)" "$(DMG_PATH)"; \
+	mkdir -p "$(DMG_STAGING)"; \
+	cp -R "$(APP_BUNDLE)" "$(DMG_STAGING)/"; \
+	ln -s /Applications "$(DMG_STAGING)/Applications"; \
+	hdiutil create \
+		-volname "$(APP_NAME) $(SHORT_VERSION)" \
+		-srcfolder "$(DMG_STAGING)" \
+		-ov \
+		-format UDZO \
+		"$(DMG_PATH)" >/dev/null; \
+	rm -rf "$(DMG_STAGING)"; \
+	echo "✓ $(CURDIR)/$(DMG_PATH)"
+
 test:
 	swift test
 
 clean:
-	rm -rf .build "$(APP_BUNDLE)"
+	rm -rf .build "$(APP_BUNDLE)" "$(APP_NAME)"-*.dmg

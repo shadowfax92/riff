@@ -53,6 +53,17 @@ Roles are defined per conversation in the **New chat** sheet; there's no global 
 | `~/.riff/config/recent-conversations.json` | Sidebar history |
 | `~/.riff/conversations/<uuid>/` | Default conversation root |
 
+## Release
+
+Push a `v*.*.*` tag and a GitHub Actions workflow builds a DMG and attaches it to a Release.
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+For a dry run without cutting a Release, go to **Actions → Release → Run workflow** and enter a version. That produces a DMG as a downloadable artifact only.
+
 ---
 
 > Personal hack. Fork, adapt, riff.

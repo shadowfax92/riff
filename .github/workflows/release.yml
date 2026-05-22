@@ -1,0 +1,73 @@
+name: Release
+
+# Tag-driven releases. Push a tag like `v0.2.0` to build a DMG and attach it
+# to a GitHub Release. The manual `workflow_dispatch` path produces a DMG as
+# a workflow artifact only — useful for testing the pipeline without cutting
+# a real release.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (no v prefix, e.g. 0.2.0)'
+        required: true
+        default: '0.0.0-dev'
+
+permissions:
+  contents: write   # required for softprops/action-gh-release to publish
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building Riff $VERSION"
+
+      - name: Build DMG
+        run: make dmg SHORT_VERSION="${{ steps.version.outputs.version }}"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Riff-${{ steps.version.outputs.version }}-dmg
+          path: Riff-${{ steps.version.outputs.version }}.dmg
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Riff-${{ steps.version.outputs.version }}.dmg
+          name: Riff ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Mount the DMG and drag **Riff** to **Applications**.
+
+            > Riff is ad-hoc signed, not notarized. On first launch macOS will
+            > refuse to open it. Either right-click the app → **Open**, then
+            > confirm in the dialog, or run:
+            >
+            > ```sh
+            > xattr -dr com.apple.quarantine /Applications/Riff.app
+            > ```
+          draft: false
+          prerelease: false
