@@ -167,7 +167,7 @@ struct ChatPaneView: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             TextField("Message agents", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
@@ -183,10 +183,9 @@ struct ChatPaneView: View {
             }
             .buttonStyle(.plain)
             .disabled(sendDisabled)
-            .padding(.bottom, 1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(Theme.Color.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
