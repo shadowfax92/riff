@@ -5,6 +5,7 @@ struct SidebarView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var showingNewConversation: Bool
     @State private var search = ""
+    @State private var pendingDelete: ConversationRow?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,6 +19,20 @@ struct SidebarView: View {
         }
         .background(Theme.Color.sidebarBackground)
         .navigationSplitViewColumnWidth(min: 240, ideal: Theme.Metric.sidebarWidth, max: 360)
+        .onDeleteCommand {
+            if let row = model.rows.first(where: { $0.id == model.selectedID }),
+               !(model.isRunning && row.id == model.selectedID) {
+                pendingDelete = row
+            }
+        }
+        .alert("Delete Conversation?", isPresented: deleteConfirmationBinding, presenting: pendingDelete) { row in
+            Button("Delete", role: .destructive) {
+                Task { await model.deleteConversation(row) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { row in
+            Text("Move \"\(row.conversation.title)\" to Trash? This removes it from Riff.")
+        }
     }
 
     private var header: some View {
@@ -88,11 +103,26 @@ struct SidebarView: View {
                         .onTapGesture {
                             Task { await model.select(row) }
                         }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                pendingDelete = row
+                            } label: {
+                                Label("Delete Conversation", systemImage: "trash")
+                            }
+                            .disabled(model.isRunning && row.id == model.selectedID)
+                        }
                 }
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 12)
         }
+    }
+
+    private var deleteConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        )
     }
 
     private var filteredRows: [ConversationRow] {

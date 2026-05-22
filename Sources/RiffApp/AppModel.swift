@@ -191,6 +191,31 @@ final class AppModel: ObservableObject {
         await runningOrchestrator?.stop()
     }
 
+    /// Deletes a conversation from disk and the sidebar. The selected running
+    /// conversation is protected because a live CLI may still be writing into
+    /// its folder.
+    func deleteConversation(_ row: ConversationRow) async {
+        guard !(isRunning && selectedID == row.id) else {
+            errorMessage = "Stop the running conversation before deleting it."
+            return
+        }
+
+        do {
+            let wasSelected = selectedID == row.id
+            try ConversationStore(rootURL: row.location.url).delete()
+            try configStore.forgetConversation(row.location)
+            try reloadRows()
+            if wasSelected {
+                clearSelection()
+                if let nextRow = rows.first {
+                    await select(nextRow)
+                }
+            }
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
     /// Persists the user-provided CLI PATH and immediately re-runs runtime
     /// detection so settings changes are reflected before the next debate.
     func saveRuntimeSettings(cliPath: String) async {
@@ -250,6 +275,17 @@ final class AppModel: ObservableObject {
         } catch {
             errorMessage = String(describing: error)
         }
+    }
+
+    private func clearSelection() {
+        selectedID = nil
+        selectedLocation = nil
+        selectedConversation = nil
+        transcript = []
+        files = []
+        selectedFile = nil
+        selectedMarkdown = ""
+        activeTurn = nil
     }
 
     private func reloadRows() throws {
