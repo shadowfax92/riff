@@ -74,7 +74,7 @@ enum Theme {
         static let avatarSize: CGFloat = 28
         static let sidebarAvatarSize: CGFloat = 38
         static let sidebarWidth: CGFloat = 280
-        static let filesWidth: CGFloat = 360
+        static let filesWidth: CGFloat = 560
     }
 
     /// Stable color for an agent based on runtime + id so the same agent

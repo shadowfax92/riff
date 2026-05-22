@@ -16,7 +16,7 @@ struct FilePaneView: View {
             }
         }
         .background(Theme.Color.filesBackground)
-        .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Metric.filesWidth, max: 520)
+        .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Metric.filesWidth, max: 920)
     }
 
     private var header: some View {
