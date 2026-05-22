@@ -194,9 +194,16 @@ final class AppModel: ObservableObject {
     /// Persists the user-provided CLI PATH and immediately re-runs runtime
     /// detection so settings changes are reflected before the next debate.
     func saveRuntimeSettings(cliPath: String) async {
+        await saveSettings(cliPath: cliPath, basePrompt: basePrompt)
+    }
+
+    /// Persists app-wide runtime and prompt settings used by future debates.
+    func saveSettings(cliPath: String, basePrompt: String) async {
         do {
             let settings = RuntimeSettings(cliPath: cliPath)
+            try configStore.writeBasePrompt(basePrompt)
             try configStore.writeRuntimeSettings(settings)
+            self.basePrompt = basePrompt
             runtimeSettings = settings
             detectedRuntimes = await detectRuntimes()
         } catch {

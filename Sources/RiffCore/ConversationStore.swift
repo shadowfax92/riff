@@ -59,6 +59,25 @@ public struct ConversationStore: Sendable {
         try RiffJSON.write(conversation, to: conversationURL)
     }
 
+    /// Deletes the whole conversation root. App code moves folders to Trash
+    /// by default so custom conversation folders are recoverable; tests can
+    /// request permanent removal for deterministic temp-directory cleanup.
+    public func delete(moveToTrash: Bool = true) throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: rootURL.path) else {
+            return
+        }
+        guard fm.fileExists(atPath: conversationURL.path) else {
+            throw StoreError.missingConversation(rootURL.path)
+        }
+        if moveToTrash {
+            var trashedURL: NSURL?
+            try fm.trashItem(at: rootURL, resultingItemURL: &trashedURL)
+        } else {
+            try fm.removeItem(at: rootURL)
+        }
+    }
+
     public func appendTranscript(_ entry: TranscriptEntry) throws {
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         let data = try RiffJSON.lineData(entry)
@@ -161,6 +180,7 @@ public struct ConversationStore: Sendable {
 
 public enum StoreError: Error, Equatable {
     case invalidRelativePath(String)
+    case missingConversation(String)
 }
 
 public enum RiffJSON {

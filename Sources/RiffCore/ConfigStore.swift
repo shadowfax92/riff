@@ -43,6 +43,12 @@ public struct ConfigStore: Sendable {
         try String(contentsOf: basePromptURL, encoding: .utf8)
     }
 
+    /// Persists the shared baseline prompt used when building future agent
+    /// prompts from the app's config editor.
+    public func writeBasePrompt(_ prompt: String) throws {
+        try RiffJSON.writeText(prompt, to: basePromptURL)
+    }
+
     public func readRuntimeSettings() throws -> RuntimeSettings {
         if !FileManager.default.fileExists(atPath: runtimeSettingsURL.path) {
             return RuntimeSettings()
@@ -65,6 +71,14 @@ public struct ConfigStore: Sendable {
         var locations = try readRecentConversations()
         locations.removeAll { $0.id == location.id || $0.url == location.url }
         locations.insert(location, at: 0)
+        try RiffJSON.write(locations, to: recentConversationsURL)
+    }
+
+    /// Removes a conversation from the recent list after its on-disk folder
+    /// has been deleted or moved away.
+    public func forgetConversation(_ location: ConversationLocation) throws {
+        var locations = try readRecentConversations()
+        locations.removeAll { $0.id == location.id || $0.url == location.url }
         try RiffJSON.write(locations, to: recentConversationsURL)
     }
 

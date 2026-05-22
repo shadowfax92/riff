@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @State private var basePrompt = ""
     @State private var cliPath = ""
     @State private var isSaving = false
 
@@ -13,62 +14,31 @@ struct SettingsSheet: View {
             Text("Settings")
                 .font(.system(size: 20, weight: .semibold))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("CLI PATH")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                TextField("/Users/me/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", text: $cliPath, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11, design: .monospaced))
-                    .lineLimit(3...6)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Theme.Color.surfaceOverlay)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Theme.Color.surfaceStroke)
-                    )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    basePromptSection
+                    cliPathSection
+                    runtimesSection
+                }
+                .padding(.bottom, 2)
             }
-            .padding(12)
-            .background(Theme.Color.surfaceOverlay)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Theme.Color.surfaceStroke)
-            )
+            .frame(maxHeight: 640)
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Runtimes")
-                        .font(.system(size: 13, weight: .semibold))
-                    Spacer()
-                    Button {
-                        Task { await model.refreshRuntimes() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Refresh")
-                }
-                ForEach(RuntimeID.allCases) { runtime in
-                    runtimeRow(runtime)
-                }
-            }
-            .padding(12)
-            .background(Theme.Color.surfaceOverlay)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Theme.Color.surfaceStroke)
-            )
+            Divider().background(Theme.Color.separator)
 
             HStack {
                 Button {
                     cliPath = RuntimeSettings.defaultCLIPath()
                 } label: {
-                    Label("Default", systemImage: "arrow.counterclockwise")
+                    Label("Default PATH", systemImage: "arrow.counterclockwise")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+
+                Button {
+                    basePrompt = ConfigStore.defaultPrompt
+                } label: {
+                    Label("Default Prompt", systemImage: "doc.badge.arrow.up")
                         .font(.system(size: 12))
                 }
                 .controlSize(.small)
@@ -87,7 +57,7 @@ struct SettingsSheet: View {
                 Button("Save") {
                     isSaving = true
                     Task {
-                        await model.saveRuntimeSettings(cliPath: cliPath)
+                        await model.saveSettings(cliPath: cliPath, basePrompt: basePrompt)
                         await MainActor.run {
                             isSaving = false
                             dismiss()
@@ -95,14 +65,120 @@ struct SettingsSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isSaving || cliPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(isSaving || cliPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || basePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(22)
-        .frame(width: 560)
+        .frame(width: 680)
         .onAppear {
+            basePrompt = model.basePrompt
             cliPath = model.runtimeSettings.cliPath
         }
+    }
+
+    private var basePromptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Base Prompt")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button {
+                    NSWorkspace.shared.open(model.basePromptURL)
+                } label: {
+                    Label("Edit File", systemImage: "pencil")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+                Button {
+                    model.reloadBasePrompt()
+                    basePrompt = model.basePrompt
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Reload from disk")
+            }
+            TextEditor(text: $basePrompt)
+                .font(.system(size: 11, design: .monospaced))
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(minHeight: 180, maxHeight: 240)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.surfaceStroke)
+                )
+            Text(model.basePromptURL.path)
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
+    }
+
+    private var cliPathSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("CLI PATH")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField("/Users/me/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", text: $cliPath, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(3...6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.surfaceStroke)
+                )
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
+    }
+
+    private var runtimesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Runtimes")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button {
+                    Task { await model.refreshRuntimes() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Refresh")
+            }
+            ForEach(RuntimeID.allCases) { runtime in
+                runtimeRow(runtime)
+            }
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
     }
 
     private func runtimeRow(_ runtime: RuntimeID) -> some View {

@@ -178,20 +178,6 @@ struct NewConversationSheet: View {
                 .buttonStyle(.borderless)
                 .help("Reload from disk")
             }
-            DisclosureGroup("Preview") {
-                ScrollView {
-                    Text(model.basePrompt)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                        .padding(10)
-                }
-                .frame(maxHeight: 160)
-                .background(Theme.Color.surfaceOverlay)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .font(.system(size: 11))
         }
         .padding(12)
         .background(Theme.Color.surfaceOverlay)
