@@ -80,6 +80,39 @@ import Testing
     #expect(detected.models.contains { $0.id == "sonnet" })
 }
 
+@Test func runtimeDetectionPrefersConfiguredCommandPath() async {
+    let client = FakeProcessClient(results: [
+        "/Users/me/.local/bin/claude --version": ProcessResult(stdout: "2.1.0\n"),
+    ])
+    let detector = RuntimeDetector(processClient: client)
+
+    let detected = await detector.detect(
+        RuntimeDefinitions.claude,
+        preferredCommand: "/Users/me/.local/bin/claude"
+    )
+
+    #expect(detected.available)
+    #expect(detected.command == "/Users/me/.local/bin/claude")
+    #expect(await client.commands() == ["/Users/me/.local/bin/claude"])
+}
+
+@Test func runtimeDetectionDoesNotFallbackWhenConfiguredPathIsMissing() async {
+    let client = FakeProcessClient(results: [
+        "/missing/claude --version": ProcessResult(stdout: "", exitCode: 127),
+        "claude --version": ProcessResult(stdout: "should not be used\n"),
+    ])
+    let detector = RuntimeDetector(processClient: client)
+
+    let detected = await detector.detect(
+        RuntimeDefinitions.claude,
+        preferredCommand: "/missing/claude"
+    )
+
+    #expect(!detected.available)
+    #expect(detected.command == "/missing/claude")
+    #expect(await client.commands() == ["/missing/claude"])
+}
+
 @Test func codexDebugModelsParserSkipsHiddenModels() {
     let models = parseCodexDebugModels("""
     {"models":[{"slug":"gpt-5.4","display_name":"GPT 5.4"},{"slug":"secret","visibility":"hidden"}]}

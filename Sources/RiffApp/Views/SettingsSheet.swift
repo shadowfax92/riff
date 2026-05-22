@@ -6,7 +6,8 @@ struct SettingsSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var basePrompt = ""
-    @State private var cliPath = ""
+    @State private var claudePath = ""
+    @State private var codexPath = ""
     @State private var isSaving = false
 
     var body: some View {
@@ -17,7 +18,7 @@ struct SettingsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     basePromptSection
-                    cliPathSection
+                    agentPathsSection
                     runtimesSection
                 }
                 .padding(.bottom, 2)
@@ -28,9 +29,10 @@ struct SettingsSheet: View {
 
             HStack {
                 Button {
-                    cliPath = RuntimeSettings.defaultCLIPath()
+                    claudePath = RuntimeSettings.defaultExecutablePath(for: .claude)
+                    codexPath = RuntimeSettings.defaultExecutablePath(for: .codex)
                 } label: {
-                    Label("Default PATH", systemImage: "arrow.counterclockwise")
+                    Label("Default Paths", systemImage: "arrow.counterclockwise")
                         .font(.system(size: 12))
                 }
                 .controlSize(.small)
@@ -57,7 +59,7 @@ struct SettingsSheet: View {
                 Button("Save") {
                     isSaving = true
                     Task {
-                        await model.saveSettings(cliPath: cliPath, basePrompt: basePrompt)
+                        await model.saveSettings(claudePath: claudePath, codexPath: codexPath, basePrompt: basePrompt)
                         await MainActor.run {
                             isSaving = false
                             dismiss()
@@ -65,14 +67,15 @@ struct SettingsSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isSaving || cliPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || basePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(isSaving || claudePath.trimmedForSettings.isEmpty || codexPath.trimmedForSettings.isEmpty || basePrompt.trimmedForSettings.isEmpty)
             }
         }
         .padding(22)
         .frame(width: 680)
         .onAppear {
             basePrompt = model.basePrompt
-            cliPath = model.runtimeSettings.cliPath
+            claudePath = model.runtimeSettings.claudePath
+            codexPath = model.runtimeSettings.codexPath
         }
     }
 
@@ -126,23 +129,20 @@ struct SettingsSheet: View {
         )
     }
 
-    private var cliPathSection: some View {
+    private var agentPathsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("CLI PATH")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("/Users/me/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", text: $cliPath, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.system(size: 11, design: .monospaced))
-                .lineLimit(3...6)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Theme.Color.surfaceOverlay)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Theme.Color.surfaceStroke)
-                )
+            Text("Agent Paths")
+                .font(.system(size: 13, weight: .semibold))
+            pathField(
+                label: "Claude",
+                placeholder: "/Users/me/.local/bin/claude",
+                text: $claudePath
+            )
+            pathField(
+                label: "Codex",
+                placeholder: "/Users/me/.local/bin/codex",
+                text: $codexPath
+            )
         }
         .padding(12)
         .background(Theme.Color.surfaceOverlay)
@@ -153,6 +153,26 @@ struct SettingsSheet: View {
         )
     }
 
+    private func pathField(label: String, placeholder: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.surfaceStroke)
+                )
+        }
+    }
+
     private var runtimesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -160,7 +180,9 @@ struct SettingsSheet: View {
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Button {
-                    Task { await model.refreshRuntimes() }
+                    Task {
+                        await model.saveSettings(claudePath: claudePath, codexPath: codexPath, basePrompt: basePrompt)
+                    }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .foregroundStyle(.secondary)
@@ -217,5 +239,11 @@ struct SettingsSheet: View {
             return "\(detected.command) · \(version)"
         }
         return detected.command
+    }
+}
+
+private extension String {
+    var trimmedForSettings: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

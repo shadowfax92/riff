@@ -24,7 +24,12 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showingNewConversation) {
-            NewConversationSheet()
+            NewConversationSheet {
+                showingNewConversation = false
+                DispatchQueue.main.async {
+                    showingSettings = true
+                }
+            }
                 .environmentObject(model)
         }
         .sheet(isPresented: $showingSettings) {

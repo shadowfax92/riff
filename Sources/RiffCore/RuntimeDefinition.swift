@@ -210,10 +210,21 @@ public struct RuntimeDetector: Sendable {
         self.processClient = processClient
     }
 
-    /// Probes runtime binaries in declared order and returns usable fallback
-    /// metadata even when live model discovery is unavailable.
-    public func detect(_ definition: RuntimeDefinition) async -> DetectedRuntime {
-        for candidate in definition.binaryCandidates {
+    /// Probes the configured executable path when present; otherwise falls
+    /// back to known binary names and still returns offline model metadata.
+    public func detect(_ definition: RuntimeDefinition, preferredCommand: String? = nil) async -> DetectedRuntime {
+        let preferred = preferredCommand?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let preferred, preferred.isEmpty {
+            return DetectedRuntime(
+                id: definition.id,
+                available: false,
+                command: definition.binaryCandidates.first ?? definition.id.rawValue,
+                models: definition.fallbackModels
+            )
+        }
+        let candidates = preferred.map { [$0] } ?? definition.binaryCandidates
+        var seen = Set<String>()
+        for candidate in candidates where seen.insert(candidate).inserted {
             let probe = ProcessInvocation(
                 command: candidate,
                 arguments: definition.versionArguments,
@@ -234,7 +245,7 @@ public struct RuntimeDetector: Sendable {
         return DetectedRuntime(
             id: definition.id,
             available: false,
-            command: definition.binaryCandidates.first ?? definition.id.rawValue,
+            command: preferred ?? definition.binaryCandidates.first ?? definition.id.rawValue,
             models: definition.fallbackModels
         )
     }

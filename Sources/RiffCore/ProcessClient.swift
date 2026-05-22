@@ -84,6 +84,13 @@ public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
 
             do {
                 try process.run()
+                if let timeout = invocation.timeout, timeout > 0 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                        if process.isRunning {
+                            process.terminate()
+                        }
+                    }
+                }
                 if let input = invocation.stdin {
                     stdin.fileHandleForWriting.write(Data(input.utf8))
                 }

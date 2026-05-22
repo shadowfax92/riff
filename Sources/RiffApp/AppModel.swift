@@ -66,7 +66,7 @@ final class AppModel: ObservableObject {
 
     /// Creates a file-backed conversation either in the default Riff root or
     /// in a folder the user selected from the macOS file picker.
-    func createConversation(title: String, prompt: String, maxRounds: Int, customFolder: URL?, roleDrafts: [RoleDraft]) async {
+    func createConversation(title: String, prompt: String, maxRounds: Int, customFolder: URL?, roleDrafts: [RoleDraft]) async -> Bool {
         do {
             let agents = roleDrafts
                 .filter(\.isValid)
@@ -74,7 +74,15 @@ final class AppModel: ObservableObject {
                 .map { offset, draft in draft.agentProfile(index: offset + 1) }
             guard !agents.isEmpty else {
                 errorMessage = "Add at least one role with ROLE_NAME and ROLE_PROMPT."
-                return
+                return false
+            }
+            let missingRuntimes = RuntimeRequirement.missingRuntimes(
+                agents: agents,
+                detectedRuntimes: detectedRuntimes
+            )
+            guard missingRuntimes.isEmpty else {
+                errorMessage = RuntimeRequirement.settingsMessage(for: missingRuntimes)
+                return false
             }
             let id = RiffPathFormat.newConversationID()
             let root = customFolder ?? paths.defaultConversationURL(id: id)
@@ -93,9 +101,22 @@ final class AppModel: ObservableObject {
             if let row = rows.first(where: { $0.id == id }) {
                 await select(row)
             }
+            return true
         } catch {
             errorMessage = String(describing: error)
+            return false
         }
+    }
+
+    /// Builds the inline setup prompt for the New Riff sheet from the same
+    /// runtime readiness rule used by conversation creation.
+    func runtimeSettingsPrompt(for roleDrafts: [RoleDraft]) -> String? {
+        RuntimeRequirement.settingsMessage(
+            for: RuntimeRequirement.missingRuntimes(
+                roleDrafts: roleDrafts,
+                detectedRuntimes: detectedRuntimes
+            )
+        )
     }
 
     func sendUserMessage(_ text: String) async {
@@ -216,16 +237,16 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Persists the user-provided CLI PATH and immediately re-runs runtime
+    /// Persists explicit runtime executable paths and immediately re-runs
     /// detection so settings changes are reflected before the next debate.
-    func saveRuntimeSettings(cliPath: String) async {
-        await saveSettings(cliPath: cliPath, basePrompt: basePrompt)
+    func saveRuntimeSettings(claudePath: String, codexPath: String) async {
+        await saveSettings(claudePath: claudePath, codexPath: codexPath, basePrompt: basePrompt)
     }
 
     /// Persists app-wide runtime and prompt settings used by future debates.
-    func saveSettings(cliPath: String, basePrompt: String) async {
+    func saveSettings(claudePath: String, codexPath: String, basePrompt: String) async {
         do {
-            let settings = RuntimeSettings(cliPath: cliPath)
+            let settings = RuntimeSettings(claudePath: claudePath, codexPath: codexPath)
             try configStore.writeBasePrompt(basePrompt)
             try configStore.writeRuntimeSettings(settings)
             self.basePrompt = basePrompt
@@ -237,7 +258,10 @@ final class AppModel: ObservableObject {
     }
 
     func resetRuntimeSettings() async {
-        await saveRuntimeSettings(cliPath: RuntimeSettings.defaultCLIPath())
+        await saveRuntimeSettings(
+            claudePath: RuntimeSettings.defaultExecutablePath(for: .claude),
+            codexPath: RuntimeSettings.defaultExecutablePath(for: .codex)
+        )
     }
 
     func refreshRuntimes() async {
@@ -325,8 +349,8 @@ final class AppModel: ObservableObject {
     private func detectRuntimes() async -> [RuntimeID: DetectedRuntime] {
         let detector = RuntimeDetector(processClient: FoundationProcessClient(environment: runtimeSettings.processEnvironment))
         let results = await [
-            detector.detect(RuntimeDefinitions.claude),
-            detector.detect(RuntimeDefinitions.codex),
+            detector.detect(RuntimeDefinitions.claude, preferredCommand: runtimeSettings.command(for: .claude)),
+            detector.detect(RuntimeDefinitions.codex, preferredCommand: runtimeSettings.command(for: .codex)),
         ]
         return Dictionary(uniqueKeysWithValues: results.map { ($0.id, $0) })
     }

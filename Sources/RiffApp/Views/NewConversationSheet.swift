@@ -5,6 +5,7 @@ import SwiftUI
 struct NewConversationSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    let onOpenSettings: () -> Void
     @State private var title = ""
     @State private var prompt = ""
     @State private var maxRounds = 10
@@ -18,6 +19,10 @@ struct NewConversationSheet: View {
             runtime: .claude
         )
     ]
+
+    init(onOpenSettings: @escaping () -> Void = {}) {
+        self.onOpenSettings = onOpenSettings
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -51,6 +56,10 @@ struct NewConversationSheet: View {
 
                     basePromptRow
 
+                    if let runtimeSettingsMessage {
+                        runtimeSettingsPrompt(message: runtimeSettingsMessage)
+                    }
+
                     rolesSection
                 }
                 .padding(.bottom, 4)
@@ -64,14 +73,16 @@ struct NewConversationSheet: View {
                 Button("Cancel") { dismiss() }
                 Button("Create") {
                     Task {
-                        await model.createConversation(
+                        let created = await model.createConversation(
                             title: trimmedTitle,
                             prompt: prompt,
                             maxRounds: maxRounds,
                             customFolder: customFolder,
                             roleDrafts: roleDrafts
                         )
-                        dismiss()
+                        if created {
+                            dismiss()
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -85,6 +96,39 @@ struct NewConversationSheet: View {
                 customFolder = url
             }
         }
+    }
+
+    private func runtimeSettingsPrompt(message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .font(.system(size: 14, weight: .semibold))
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(message)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary)
+                Text("Open Settings and set the missing executable path, then refresh runtimes.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                dismiss()
+                onOpenSettings()
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.system(size: 12))
+            }
+            .controlSize(.small)
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
     }
 
     private func fieldGroup<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -224,6 +268,11 @@ struct NewConversationSheet: View {
     private var canCreate: Bool {
         !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && roleDrafts.contains(where: \.isValid)
+            && runtimeSettingsMessage == nil
+    }
+
+    private var runtimeSettingsMessage: String? {
+        model.runtimeSettingsPrompt(for: roleDrafts)
     }
 
     private var trimmedTitle: String {

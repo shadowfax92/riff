@@ -24,6 +24,20 @@ import Testing
     #expect(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "ok")
 }
 
+@Test func processClientTerminatesTimedOutProcesses() async throws {
+    let client = FoundationProcessClient()
+    let start = Date()
+
+    let result = try await client.run(ProcessInvocation(
+        command: "/bin/sleep",
+        arguments: ["5"],
+        timeout: 0.2
+    ))
+
+    #expect(Date().timeIntervalSince(start) < 2)
+    #expect(result.exitCode != 0)
+}
+
 private func processClientTemporaryDirectory() throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appending(path: "riff-process-client-tests-\(UUID().uuidString)", directoryHint: .isDirectory)
