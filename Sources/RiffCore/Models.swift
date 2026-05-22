@@ -189,15 +189,42 @@ public struct TranscriptEntry: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// Per-agent runtime state used to resume CLI sessions and avoid replaying
+/// transcript context that the agent has already seen.
 public struct AgentSession: Codable, Equatable, Sendable {
     public var sessionID: String?
     public var model: String
     public var lastUsedAt: Date?
+    public var lastContextTurn: Int
 
-    public init(sessionID: String? = nil, model: String = "default", lastUsedAt: Date? = nil) {
+    public init(sessionID: String? = nil, model: String = "default", lastUsedAt: Date? = nil, lastContextTurn: Int = 0) {
         self.sessionID = sessionID
         self.model = model
         self.lastUsedAt = lastUsedAt
+        self.lastContextTurn = max(0, lastContextTurn)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionID
+        case model
+        case lastUsedAt
+        case lastContextTurn
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionID = try container.decodeIfPresent(String.self, forKey: .sessionID)
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? "default"
+        lastUsedAt = try container.decodeIfPresent(Date.self, forKey: .lastUsedAt)
+        lastContextTurn = max(0, try container.decodeIfPresent(Int.self, forKey: .lastContextTurn) ?? 0)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(sessionID, forKey: .sessionID)
+        try container.encode(model, forKey: .model)
+        try container.encodeIfPresent(lastUsedAt, forKey: .lastUsedAt)
+        try container.encode(lastContextTurn, forKey: .lastContextTurn)
     }
 }
 
