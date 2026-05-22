@@ -171,6 +171,34 @@ import Testing
     #expect(prompt.contains("ROLE_PROMPT:\nPressure-test trust boundaries."))
 }
 
+@Test func SummaryRuntimePromptUsesSummaryPromptAndFullContext() {
+    let prompt = RuntimePromptBuilder.prompt(
+        for: RuntimeTurnRequest(
+            purpose: .summary,
+            agent: AgentProfile(
+                id: "a1",
+                name: "First Agent",
+                role: "For",
+                runtime: .claude,
+                instructions: "argue for"
+            ),
+            conversationRoot: URL(fileURLWithPath: "/tmp/riff"),
+            baselinePrompt: "summary instructions",
+            conversationPrompt: "Will we get AGI?",
+            context: "You: keep it simple\n\nFirst Agent: yes\n\nSecond Agent: no",
+            attachmentPath: "files/summary.md"
+        ),
+        includeInstructions: true
+    )
+
+    #expect(prompt.contains("summary instructions"))
+    #expect(prompt.contains("Debate prompt:\nWill we get AGI?"))
+    #expect(prompt.contains("Full conversation:\nYou: keep it simple"))
+    #expect(!prompt.contains("ROLE_PROMPT"))
+    #expect(!prompt.contains("Response contract"))
+    #expect(!prompt.contains("files/summary.md"))
+}
+
 private func hasPair(_ args: [String], _ key: String, _ value: String) -> Bool {
     zip(args, args.dropFirst()).contains { $0 == key && $1 == value }
 }

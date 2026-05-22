@@ -6,6 +6,7 @@ public enum RuntimeEvent: Equatable, Sendable {
 }
 
 public struct RuntimeTurnRequest: Equatable, Sendable {
+    public var purpose: RuntimeTurnPurpose
     public var agent: AgentProfile
     public var conversationRoot: URL
     public var sessionID: String?
@@ -15,6 +16,7 @@ public struct RuntimeTurnRequest: Equatable, Sendable {
     public var attachmentPath: String
 
     public init(
+        purpose: RuntimeTurnPurpose = .debate,
         agent: AgentProfile,
         conversationRoot: URL,
         sessionID: String? = nil,
@@ -23,6 +25,7 @@ public struct RuntimeTurnRequest: Equatable, Sendable {
         context: String,
         attachmentPath: String
     ) {
+        self.purpose = purpose
         self.agent = agent
         self.conversationRoot = conversationRoot
         self.sessionID = sessionID
@@ -31,6 +34,11 @@ public struct RuntimeTurnRequest: Equatable, Sendable {
         self.context = context
         self.attachmentPath = attachmentPath
     }
+}
+
+public enum RuntimeTurnPurpose: Equatable, Sendable {
+    case debate
+    case summary
 }
 
 public struct RuntimeTurnResult: Equatable, Sendable {
@@ -106,6 +114,10 @@ public enum RuntimePromptBuilder {
     /// Builds the stdin prompt for one agent turn. First turns include role
     /// instructions; resumed turns rely on the CLI session and send only debate context.
     public static func prompt(for request: RuntimeTurnRequest, includeInstructions: Bool) -> String {
+        if request.purpose == .summary {
+            return summaryPrompt(for: request)
+        }
+
         var parts: [String] = []
         if includeInstructions {
             parts.append(request.baselinePrompt.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -128,6 +140,22 @@ public enum RuntimePromptBuilder {
             parts.append("No prior messages yet.")
         } else {
             parts.append("Conversation context:\n\(request.context)")
+        }
+        return parts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    private static func summaryPrompt(for request: RuntimeTurnRequest) -> String {
+        var parts: [String] = []
+        parts.append(request.baselinePrompt.trimmingCharacters(in: .whitespacesAndNewlines))
+        parts.append("You are \(request.agent.name), summarizing this completed Riff debate from a fresh session.")
+        parts.append("Debate prompt:\n\(request.conversationPrompt)")
+        if request.context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            parts.append("No conversation transcript.")
+        } else {
+            parts.append("Full conversation:\n\(request.context)")
         }
         return parts
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
