@@ -26,6 +26,11 @@ enum Theme {
             light: SwiftUI.Color(red: 0.91, green: 0.91, blue: 0.93),
             dark: SwiftUI.Color(red: 0.23, green: 0.23, blue: 0.24)
         )
+        static let summaryBubble = dynamic(
+            light: SwiftUI.Color(red: 0.98, green: 0.93, blue: 0.74),
+            dark: SwiftUI.Color(red: 0.32, green: 0.27, blue: 0.15)
+        )
+        static let summaryAccent = SwiftUI.Color(red: 0.78, green: 0.58, blue: 0.16)
 
         static let sidebarRowSelected = SwiftUI.Color.accentColor.opacity(0.22)
         static let cardBackground = dynamic(
@@ -89,6 +94,9 @@ enum Theme {
     static func color(forSpeakerID id: String, runtime: RuntimeID?) -> SwiftUI.Color {
         if id == "user" {
             return Theme.Color.userBubble
+        }
+        if id == "summary" {
+            return Theme.Color.summaryAccent
         }
         if let runtime, let preset = runtimePreset[runtime] {
             return preset

@@ -324,16 +324,23 @@ final class AppModel: ObservableObject {
     /// Persists explicit runtime executable paths and immediately re-runs
     /// detection so settings changes are reflected before the next debate.
     func saveRuntimeSettings(claudePath: String, codexPath: String) async {
-        await saveSettings(claudePath: claudePath, codexPath: codexPath, basePrompt: basePrompt)
+        await saveSettings(
+            claudePath: claudePath,
+            codexPath: codexPath,
+            basePrompt: basePrompt,
+            summaryPrompt: summaryPrompt
+        )
     }
 
     /// Persists app-wide runtime and prompt settings used by future debates.
-    func saveSettings(claudePath: String, codexPath: String, basePrompt: String) async {
+    func saveSettings(claudePath: String, codexPath: String, basePrompt: String, summaryPrompt: String) async {
         do {
             let settings = RuntimeSettings(claudePath: claudePath, codexPath: codexPath)
             try configStore.writeBasePrompt(basePrompt)
+            try configStore.writeSummaryPrompt(summaryPrompt)
             try configStore.writeRuntimeSettings(settings)
             self.basePrompt = basePrompt
+            self.summaryPrompt = summaryPrompt
             runtimeSettings = settings
             detectedRuntimes = await detectRuntimes()
         } catch {

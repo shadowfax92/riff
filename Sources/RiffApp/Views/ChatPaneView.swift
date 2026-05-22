@@ -275,6 +275,7 @@ private struct MessageRow: View {
     let showHeader: Bool
 
     private var isUser: Bool { entry.speakerID == "user" }
+    private var isSummary: Bool { entry.speakerID == "summary" }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -361,12 +362,15 @@ private struct MessageRow: View {
         if entry.error != nil {
             return Color.red.opacity(0.32)
         }
+        if isSummary {
+            return Theme.Color.summaryBubble
+        }
         return isUser ? Theme.Color.userBubble : Theme.Color.agentBubble
     }
 
-    /// User and error bubbles get no word count — only normal agent turns.
+    /// User, summary, and error bubbles get no word count; only normal agent turns do.
     private var wordCountLabel: String? {
-        guard !isUser, entry.error == nil else { return nil }
+        guard !isUser, !isSummary, entry.error == nil else { return nil }
         let count = entry.text.split(whereSeparator: \.isWhitespace).count
         guard count > 0 else { return nil }
         return "\(count) words"

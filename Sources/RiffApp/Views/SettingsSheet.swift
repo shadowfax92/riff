@@ -7,6 +7,7 @@ struct SettingsSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var basePrompt = ""
+    @State private var summaryPrompt = ""
     @State private var claudePath = ""
     @State private var codexPath = ""
     @State private var isSaving = false
@@ -19,6 +20,7 @@ struct SettingsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     basePromptSection
+                    summaryPromptSection
                     agentPathsSection
                     runtimesSection
                 }
@@ -52,7 +54,12 @@ struct SettingsSheet: View {
                 Button("Save") {
                     isSaving = true
                     Task {
-                        await model.saveSettings(claudePath: claudePath, codexPath: codexPath, basePrompt: basePrompt)
+                        await model.saveSettings(
+                            claudePath: claudePath,
+                            codexPath: codexPath,
+                            basePrompt: basePrompt,
+                            summaryPrompt: summaryPrompt
+                        )
                         await MainActor.run {
                             isSaving = false
                             dismiss()
@@ -60,13 +67,14 @@ struct SettingsSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isSaving || claudePath.trimmedForSettings.isEmpty || codexPath.trimmedForSettings.isEmpty || basePrompt.trimmedForSettings.isEmpty)
+                .disabled(isSaving || claudePath.trimmedForSettings.isEmpty || codexPath.trimmedForSettings.isEmpty || basePrompt.trimmedForSettings.isEmpty || summaryPrompt.trimmedForSettings.isEmpty)
             }
         }
         .padding(22)
         .frame(width: 680)
         .onAppear {
             basePrompt = model.basePrompt
+            summaryPrompt = model.summaryPrompt
             claudePath = model.runtimeSettings.claudePath
             codexPath = model.runtimeSettings.codexPath
         }
@@ -109,6 +117,57 @@ struct SettingsSheet: View {
                         .stroke(Theme.Color.surfaceStroke)
                 )
             Text(model.basePromptURL.path)
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
+    }
+
+    private var summaryPromptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Summary Prompt")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button {
+                    NSWorkspace.shared.open(model.summaryPromptURL)
+                } label: {
+                    Label("Edit File", systemImage: "pencil")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+                Button {
+                    model.reloadSummaryPrompt()
+                    summaryPrompt = model.summaryPrompt
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Reload from disk")
+            }
+            ScrollView {
+                Markdown(summaryPrompt)
+                    .markdownTheme(.settingsPreview)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
+                .frame(minHeight: 150, maxHeight: 220)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.surfaceStroke)
+                )
+            Text(model.summaryPromptURL.path)
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -175,7 +234,12 @@ struct SettingsSheet: View {
                 Spacer()
                 Button {
                     Task {
-                        await model.saveSettings(claudePath: claudePath, codexPath: codexPath, basePrompt: basePrompt)
+                        await model.saveSettings(
+                            claudePath: claudePath,
+                            codexPath: codexPath,
+                            basePrompt: basePrompt,
+                            summaryPrompt: summaryPrompt
+                        )
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")
