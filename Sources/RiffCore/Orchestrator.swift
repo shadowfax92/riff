@@ -11,6 +11,9 @@ public actor DebateOrchestrator {
     private let baselinePrompt: String
     private let now: @Sendable () -> Date
     private let makeID: @Sendable () -> String
+    private let onTurnStart: @Sendable (AgentProfile, Int) -> Void
+    private let onTurnEvent: @Sendable (RuntimeEvent) -> Void
+    private let onTurnEnd: @Sendable () -> Void
     private var queuedUserMessages: [String] = []
     private var shouldStop = false
 
@@ -19,13 +22,19 @@ public actor DebateOrchestrator {
         adapters: [RuntimeID: any RuntimeAdapter],
         baselinePrompt: String,
         now: @escaping @Sendable () -> Date = Date.init,
-        makeID: @escaping @Sendable () -> String = { UUID().uuidString.lowercased() }
+        makeID: @escaping @Sendable () -> String = { UUID().uuidString.lowercased() },
+        onTurnStart: @escaping @Sendable (AgentProfile, Int) -> Void = { _, _ in },
+        onTurnEvent: @escaping @Sendable (RuntimeEvent) -> Void = { _ in },
+        onTurnEnd: @escaping @Sendable () -> Void = { }
     ) {
         self.store = store
         self.adapters = adapters
         self.baselinePrompt = baselinePrompt
         self.now = now
         self.makeID = makeID
+        self.onTurnStart = onTurnStart
+        self.onTurnEvent = onTurnEvent
+        self.onTurnEnd = onTurnEnd
     }
 
     public func queueUserMessage(_ text: String) {
@@ -82,6 +91,9 @@ public actor DebateOrchestrator {
             let filesBefore = Set((try store.listMarkdownFiles()).map(\.relativePath))
             let started = now()
             let session = try store.readAgentSession(agentID: agent.id)
+            onTurnStart(agent, turn)
+            defer { onTurnEnd() }
+            let turnEvent = onTurnEvent
             do {
                 let result = try await adapter.runTurn(
                     RuntimeTurnRequest(
@@ -93,7 +105,7 @@ public actor DebateOrchestrator {
                         context: composeContext(transcript),
                         attachmentPath: attachmentPath
                     ),
-                    emit: { _ in }
+                    emit: { event in turnEvent(event) }
                 )
                 let parsed = TurnResponseParser.parse(result.text)
                 let attachments = try mergedAttachments(parsed: parsed.attachments, filesBefore: filesBefore)

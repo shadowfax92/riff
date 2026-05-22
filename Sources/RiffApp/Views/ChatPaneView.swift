@@ -85,9 +85,10 @@ struct ChatPaneView: View {
                                 .id(entry.id)
                         }
                     }
-                    if model.isRunning {
-                        TypingIndicator()
+                    if let active = model.activeTurn {
+                        ThinkingIndicator(state: active)
                             .padding(.top, 6)
+                            .id("__thinking__")
                     }
                     Color.clear.frame(height: 1).id("__bottom__")
                 }
@@ -341,41 +342,99 @@ private struct AttachmentCard: View {
     }
 }
 
-private struct TypingIndicator: View {
-    @State private var phase: Int = 0
+/// Live "thinking" row shown while a CLI turn is in flight. Renders the
+/// active agent's avatar + name, a pulsing dot animation, the elapsed wall
+/// time (auto-ticking via TimelineView, no Timer needed), and a chevron
+/// that toggles the list of tool/event labels we've collected so far.
+/// Collapsed by default so it stays unobtrusive — Codex-style.
+private struct ThinkingIndicator: View {
+    let state: ActiveTurnState
+    @State private var expanded = false
+    @State private var dotPhase = 0
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            ZStack {
-                Circle().fill(Color.secondary.opacity(0.3))
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
+        HStack(alignment: .top, spacing: 8) {
+            AgentAvatar(
+                speakerID: state.agent.id,
+                speakerName: state.agent.name,
+                runtime: state.agent.runtime
+            )
+            .padding(.top, 4)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(state.agent.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        expanded.toggle()
+                    }
+                } label: {
+                    bubble
+                }
+                .buttonStyle(.plain)
+                if expanded, !state.events.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(state.events.indices, id: \.self) { idx in
+                            HStack(spacing: 6) {
+                                Image(systemName: "wrench.adjustable")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                                Text(state.events[idx])
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 2)
+                }
             }
-            .frame(width: Theme.Metric.avatarSize, height: Theme.Metric.avatarSize)
-            HStack(spacing: 4) {
+            Spacer(minLength: 60)
+        }
+        .task { await animateDots() }
+    }
+
+    private var bubble: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 3) {
                 ForEach(0..<3) { idx in
                     Circle()
                         .fill(Color.secondary)
-                        .frame(width: 6, height: 6)
-                        .opacity(phase == idx ? 1 : 0.35)
+                        .frame(width: 5, height: 5)
+                        .opacity(dotPhase == idx ? 1.0 : 0.35)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Theme.Color.agentBubble)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
-            Spacer()
+            TimelineView(.periodic(from: state.startedAt, by: 1)) { context in
+                Text(label(elapsed: context.date.timeIntervalSince(state.startedAt)))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
         }
-        .onAppear { startAnimation() }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(Theme.Color.agentBubble)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
     }
 
-    private func startAnimation() {
-        Task { @MainActor in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 380_000_000)
-                phase = (phase + 1) % 3
-            }
+    private func label(elapsed seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        if total < 60 {
+            return "Thinking · \(total)s"
+        }
+        let minutes = total / 60
+        let secs = total % 60
+        return String(format: "Thinking · %dm %02ds", minutes, secs)
+    }
+
+    private func animateDots() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 380_000_000)
+            dotPhase = (dotPhase + 1) % 3
         }
     }
 }

@@ -20,6 +20,7 @@ final class AppModel: ObservableObject {
     @Published var selectedMarkdown = ""
     @Published var basePrompt = ""
     @Published var isRunning = false
+    @Published var activeTurn: ActiveTurnState?
     @Published var errorMessage: String?
     @Published var detectedRuntimes: [RuntimeID: DetectedRuntime] = [:]
 
@@ -143,7 +144,23 @@ final class AppModel: ObservableObject {
                     command: detectedRuntimes[.codex]?.command
                 ),
             ],
-            baselinePrompt: basePrompt
+            baselinePrompt: basePrompt,
+            onTurnStart: { [weak self] agent, turn in
+                Task { @MainActor [weak self] in
+                    self?.activeTurn = ActiveTurnState(agent: agent, turn: turn, startedAt: Date())
+                }
+            },
+            onTurnEvent: { [weak self] event in
+                guard case .toolUse(let label) = event else { return }
+                Task { @MainActor [weak self] in
+                    self?.activeTurn?.events.append(label)
+                }
+            },
+            onTurnEnd: { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.activeTurn = nil
+                }
+            }
         )
         runningOrchestrator = orchestrator
         runTask = Task {
@@ -157,6 +174,7 @@ final class AppModel: ObservableObject {
             await MainActor.run {
                 self.isRunning = false
                 self.runningOrchestrator = nil
+                self.activeTurn = nil
             }
             await self.reloadSelected()
             try? self.reloadRows()

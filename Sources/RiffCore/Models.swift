@@ -89,6 +89,23 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// Live snapshot of the currently executing agent turn. Drives the
+/// "thinking…" indicator in the chat pane while a CLI is mid-flight; nil
+/// when no turn is in progress.
+public struct ActiveTurnState: Equatable, Sendable {
+    public var agent: AgentProfile
+    public var turn: Int
+    public var startedAt: Date
+    public var events: [String]
+
+    public init(agent: AgentProfile, turn: Int, startedAt: Date, events: [String] = []) {
+        self.agent = agent
+        self.turn = turn
+        self.startedAt = startedAt
+        self.events = events
+    }
+}
+
 public struct Conversation: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var title: String
