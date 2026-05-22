@@ -36,21 +36,33 @@ struct SidebarView: View {
     }
 
     private var header: some View {
-        HStack {
-            Spacer()
+        VStack(spacing: 8) {
             Button {
                 showingNewConversation = true
             } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("New chat")
+                        .font(.system(size: 14, weight: .medium))
+                    Spacer()
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 10)
+                .frame(height: 34)
+                .background(Theme.Color.inputBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.inputStroke, lineWidth: 0.75)
+                )
             }
             .buttonStyle(.plain)
             .help("New Riff")
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.top, 12)
-        .padding(.bottom, 6)
+        .padding(.bottom, 8)
     }
 
     private var searchField: some View {

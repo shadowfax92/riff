@@ -118,6 +118,22 @@ import Testing
     #expect(try store.readTextFile(relativePath: "files/turn-001.role-a1.claude.md").contains("detail"))
 }
 
+@Test func mentionedMarkdownPathIsIgnoredWhenFileDoesNotExist() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude)])
+    let adapter = MissingFileMentionAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    let transcript = try await orchestrator.run()
+
+    #expect(transcript[0].attachments.isEmpty)
+    #expect(try store.listMarkdownFiles().isEmpty)
+}
+
 @Test func stopWaitsForCurrentTurnToFinish() async throws {
     let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)])
     let adapter = BlockingAdapter()
@@ -160,6 +176,15 @@ private actor FileWritingAdapter: RuntimeAdapter {
         try "# detail".write(to: url, atomically: true, encoding: .utf8)
         return RuntimeTurnResult(
             text: "I wrote supporting detail at \(request.attachmentPath)",
+            sessionID: "session-\(request.agent.id)"
+        )
+    }
+}
+
+private actor MissingFileMentionAdapter: RuntimeAdapter {
+    func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void) async throws -> RuntimeTurnResult {
+        RuntimeTurnResult(
+            text: "I would use \(request.attachmentPath) if supporting detail were needed.",
             sessionID: "session-\(request.agent.id)"
         )
     }

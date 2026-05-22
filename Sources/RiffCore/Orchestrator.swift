@@ -202,7 +202,8 @@ public actor DebateOrchestrator {
     private func mergedAttachments(parsed: [TranscriptAttachment], filesBefore: Set<String>) throws -> [TranscriptAttachment] {
         let filesAfter = Set((try store.listMarkdownFiles()).map(\.relativePath))
         let created = filesAfter.subtracting(filesBefore).sorted().map(TranscriptAttachment.init(path:))
+        let existing = parsed.filter { filesAfter.contains($0.path) }
         var seen = Set<String>()
-        return (parsed + created).filter { seen.insert($0.path).inserted }
+        return (existing + created).filter { seen.insert($0.path).inserted }
     }
 }
