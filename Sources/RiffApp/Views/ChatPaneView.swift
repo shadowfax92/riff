@@ -290,7 +290,9 @@ private struct MessageRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            if !isUser {
+            if isUser {
+                Spacer(minLength: 60)
+            } else {
                 avatar
             }
             bubbleColumn
@@ -332,7 +334,10 @@ private struct MessageRow: View {
                     .onTapGesture { Task { await openAttachment(attachment) } }
             }
         }
-        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        // Agent column fills the row (avatar + full-width bubble).
+        // User column shrinks to the bubble's content width — the row's
+        // leading Spacer pushes it against the right edge.
+        .frame(maxWidth: isUser ? nil : .infinity, alignment: isUser ? .trailing : .leading)
     }
 
     private var bubble: some View {
@@ -341,7 +346,7 @@ private struct MessageRow: View {
             .textSelection(.enabled)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: isUser ? 520 : .infinity, alignment: .leading)
             .background(bubbleColor)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
     }
