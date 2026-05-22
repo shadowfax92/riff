@@ -70,6 +70,22 @@ import Testing
     #expect(try store.readTranscript().map(\.text) == ["first", "second"])
 }
 
+@Test func transcriptReadForDisplayDropsMissingAttachments() throws {
+    let store = ConversationStore(rootURL: try temporaryDirectory())
+    try store.create(sampleConversation())
+    var entry = sampleEntry(turn: 1, text: "detail")
+    entry.attachments = [
+        TranscriptAttachment(path: "files/missing.md"),
+        TranscriptAttachment(path: "files/present.md"),
+    ]
+    try store.appendTranscript(entry)
+    _ = try store.writeMarkdownFile(relativePath: "files/present.md", contents: "# Present")
+
+    let transcript = try store.readTranscriptWithExistingAttachments()
+
+    #expect(transcript.map(\.attachments) == [[TranscriptAttachment(path: "files/present.md")]])
+}
+
 @Test func markdownFilesAreWrittenAndListed() throws {
     let store = ConversationStore(rootURL: try temporaryDirectory())
     try store.create(sampleConversation())

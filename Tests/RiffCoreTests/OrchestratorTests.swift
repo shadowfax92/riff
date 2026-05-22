@@ -35,6 +35,26 @@ import Testing
     #expect(await adapter.requests.first?.context.contains("Please address cost.") == true)
 }
 
+@Test func transcriptChangeCallbackRunsAfterEachCommittedEntry() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude)])
+    let adapter = RecordingAdapter()
+    let recorder = TranscriptChangeRecorder()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock(),
+        onTranscriptChange: {
+            await recorder.record((try? store.readTranscript().count) ?? -1)
+        }
+    )
+
+    await orchestrator.queueUserMessage("Please address cost.")
+    _ = try await orchestrator.run()
+
+    #expect(await recorder.counts == [1, 2])
+}
+
 @Test func agentsKeepIndependentSessions() async throws {
     let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)])
     let adapter = RecordingAdapter()
@@ -166,6 +186,14 @@ private actor RecordingAdapter: RuntimeAdapter {
             sessionID: "session-\(request.agent.id)",
             model: request.agent.model
         )
+    }
+}
+
+private actor TranscriptChangeRecorder {
+    var counts: [Int] = []
+
+    func record(_ count: Int) {
+        counts.append(count)
     }
 }
 

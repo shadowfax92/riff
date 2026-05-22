@@ -100,6 +100,17 @@ public struct ConversationStore: Sendable {
             .map { try RiffJSON.decoder.decode(TranscriptEntry.self, from: Data($0.utf8)) }
     }
 
+    /// Reads transcript entries for UI presentation, keeping attachment cards
+    /// only for markdown files that still exist in the shared files directory.
+    public func readTranscriptWithExistingAttachments() throws -> [TranscriptEntry] {
+        let existingPaths = Set((try listMarkdownFiles()).map(\.relativePath))
+        return try readTranscript().map { entry in
+            var filtered = entry
+            filtered.attachments = entry.attachments.filter { existingPaths.contains($0.path) }
+            return filtered
+        }
+    }
+
     public func readAgentSession(agentID: String) throws -> AgentSession {
         let url = agentSessionURL(agentID: agentID)
         if !FileManager.default.fileExists(atPath: url.path) {

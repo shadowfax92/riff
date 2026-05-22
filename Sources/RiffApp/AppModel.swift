@@ -119,14 +119,17 @@ final class AppModel: ObservableObject {
         )
     }
 
-    func sendUserMessage(_ text: String) async {
+    /// Commits a human-authored message immediately when the debate is idle.
+    /// During a run it queues the text with the orchestrator, which will write
+    /// it at the next safe transcript boundary and trigger a UI reload.
+    func sendUserMessage(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let location = selectedLocation else {
             return
         }
         do {
             if isRunning, let runningOrchestrator {
-                await runningOrchestrator.queueUserMessage(trimmed)
+                Task { await runningOrchestrator.queueUserMessage(trimmed) }
                 return
             }
             let store = ConversationStore(rootURL: location.url)
@@ -142,7 +145,8 @@ final class AppModel: ObservableObject {
                 startedAt: date,
                 finishedAt: date
             ))
-            await reloadSelected()
+            reloadSelectedFromDisk()
+            try reloadRows()
         } catch {
             errorMessage = String(describing: error)
         }
@@ -186,6 +190,12 @@ final class AppModel: ObservableObject {
             onTurnEnd: { [weak self] in
                 Task { @MainActor [weak self] in
                     self?.activeTurn = nil
+                }
+            },
+            onTranscriptChange: { [weak self] in
+                await MainActor.run { [weak self] in
+                    self?.reloadSelectedFromDisk()
+                    try? self?.reloadRows()
                 }
             }
         )
@@ -269,13 +279,17 @@ final class AppModel: ObservableObject {
     }
 
     func reloadSelected() async {
+        reloadSelectedFromDisk()
+    }
+
+    private func reloadSelectedFromDisk() {
         guard let location = selectedLocation else {
             return
         }
         do {
             let store = ConversationStore(rootURL: location.url)
             selectedConversation = try store.readConversation()
-            transcript = try store.readTranscript()
+            transcript = try store.readTranscriptWithExistingAttachments()
             files = try store.listMarkdownFiles()
             if let selectedFile, files.contains(selectedFile) {
                 self.selectedFile = selectedFile

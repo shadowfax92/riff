@@ -14,6 +14,7 @@ public actor DebateOrchestrator {
     private let onTurnStart: @Sendable (AgentProfile, Int) -> Void
     private let onTurnEvent: @Sendable (RuntimeEvent) -> Void
     private let onTurnEnd: @Sendable () -> Void
+    private let onTranscriptChange: @Sendable () async -> Void
     private var queuedUserMessages: [String] = []
     private var shouldStop = false
 
@@ -25,7 +26,8 @@ public actor DebateOrchestrator {
         makeID: @escaping @Sendable () -> String = { UUID().uuidString.lowercased() },
         onTurnStart: @escaping @Sendable (AgentProfile, Int) -> Void = { _, _ in },
         onTurnEvent: @escaping @Sendable (RuntimeEvent) -> Void = { _ in },
-        onTurnEnd: @escaping @Sendable () -> Void = { }
+        onTurnEnd: @escaping @Sendable () -> Void = { },
+        onTranscriptChange: @escaping @Sendable () async -> Void = { }
     ) {
         self.store = store
         self.adapters = adapters
@@ -35,6 +37,7 @@ public actor DebateOrchestrator {
         self.onTurnStart = onTurnStart
         self.onTurnEvent = onTurnEvent
         self.onTurnEnd = onTurnEnd
+        self.onTranscriptChange = onTranscriptChange
     }
 
     public func queueUserMessage(_ text: String) {
@@ -76,6 +79,7 @@ public actor DebateOrchestrator {
                 let entry = userEntry(text: text, turn: transcript.count + 1)
                 try store.appendTranscript(entry)
                 transcript.append(entry)
+                await onTranscriptChange()
             }
             if stopRequested() {
                 break
@@ -93,7 +97,6 @@ public actor DebateOrchestrator {
             let session = try store.readAgentSession(agentID: agent.id)
             let contextCursor = max(session.lastContextTurn, transcript.map(\.turn).max() ?? 0)
             onTurnStart(agent, turn)
-            defer { onTurnEnd() }
             let turnEvent = onTurnEvent
             do {
                 let result = try await adapter.runTurn(
@@ -136,6 +139,8 @@ public actor DebateOrchestrator {
                     ),
                     agentID: agent.id
                 )
+                onTurnEnd()
+                await onTranscriptChange()
             } catch {
                 let finished = now()
                 let entry = TranscriptEntry(
@@ -152,6 +157,8 @@ public actor DebateOrchestrator {
                 )
                 try store.appendTranscript(entry)
                 transcript.append(entry)
+                onTurnEnd()
+                await onTranscriptChange()
                 throw error
             }
             agentTurns += 1

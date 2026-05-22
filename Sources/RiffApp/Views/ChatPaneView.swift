@@ -161,7 +161,7 @@ struct ChatPaneView: View {
         guard !sendDisabled else { return }
         let text = draft
         draft = ""
-        Task { await model.sendUserMessage(text) }
+        model.sendUserMessage(text)
     }
 }
 
