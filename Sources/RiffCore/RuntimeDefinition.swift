@@ -203,7 +203,7 @@ public struct DetectedRuntime: Equatable, Sendable {
     }
 }
 
-public struct RuntimeDetector {
+public struct RuntimeDetector: Sendable {
     private let processClient: ProcessClient
 
     public init(processClient: ProcessClient = FoundationProcessClient()) {

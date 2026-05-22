@@ -55,21 +55,28 @@ public enum RuntimeAdapterError: Error, Equatable {
 
 public final class CLIRuntimeAdapter: RuntimeAdapter, @unchecked Sendable {
     private let definition: RuntimeDefinition
+    private let command: String
     private let processClient: ProcessClient
 
-    public init(definition: RuntimeDefinition, processClient: ProcessClient = FoundationProcessClient()) {
+    public init(
+        definition: RuntimeDefinition,
+        command: String? = nil,
+        processClient: ProcessClient = FoundationProcessClient()
+    ) {
         self.definition = definition
+        self.command = command ?? definition.binaryCandidates.first ?? definition.id.rawValue
         self.processClient = processClient
     }
 
     public func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void = { _ in }) async throws -> RuntimeTurnResult {
         let stdin = RuntimePromptBuilder.prompt(for: request, includeInstructions: request.sessionID == nil)
-        let invocation = definition.buildInvocation(RuntimeInvocationRequest(
+        var invocation = definition.buildInvocation(RuntimeInvocationRequest(
             sessionID: request.sessionID,
             cwd: request.conversationRoot,
             options: RuntimeBuildOptions(model: request.agent.model, reasoning: request.agent.reasoning),
             stdin: stdin
         ))
+        invocation.command = command
         let result = try await processClient.run(invocation)
         if result.exitCode != 0 {
             throw RuntimeAdapterError.processFailed(

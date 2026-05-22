@@ -88,19 +88,51 @@ import Testing
     #expect(models?.map(\.id) == ["default", "gpt-5.4"])
 }
 
+@Test func cliAdapterUsesDetectedCommandOverride() async throws {
+    let client = FakeProcessClient(results: [
+        "openclaude -p --input-format text --output-format stream-json --verbose --permission-mode bypassPermissions --add-dir /tmp/riff": ProcessResult(stdout: """
+        {"type":"system","subtype":"init","session_id":"sid","model":"sonnet"}
+        {"type":"result","result":"hello","session_id":"sid","model":"sonnet"}
+        """)
+    ])
+    let adapter = CLIRuntimeAdapter(
+        definition: RuntimeDefinitions.claude,
+        command: "openclaude",
+        processClient: client
+    )
+
+    let result = try await adapter.runTurn(RuntimeTurnRequest(
+        agent: AgentProfile(id: "a", name: "A", role: "Role", runtime: .claude, model: "default", instructions: ""),
+        conversationRoot: URL(fileURLWithPath: "/tmp/riff"),
+        baselinePrompt: "base",
+        conversationPrompt: "prompt",
+        context: "",
+        attachmentPath: "files/turn-001.role.claude.md"
+    ))
+
+    #expect(result.sessionID == "sid")
+    #expect(await client.commands() == ["openclaude"])
+}
+
 private func hasPair(_ args: [String], _ key: String, _ value: String) -> Bool {
     zip(args, args.dropFirst()).contains { $0 == key && $1 == value }
 }
 
 private actor FakeProcessClient: ProcessClient {
     var results: [String: ProcessResult]
+    var invocations: [ProcessInvocation] = []
 
     init(results: [String: ProcessResult]) {
         self.results = results
     }
 
     func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {
+        invocations.append(invocation)
         let key = ([invocation.command] + invocation.arguments).joined(separator: " ")
         return results[key] ?? ProcessResult(stdout: "", exitCode: 1)
+    }
+
+    func commands() -> [String] {
+        invocations.map(\.command)
     }
 }

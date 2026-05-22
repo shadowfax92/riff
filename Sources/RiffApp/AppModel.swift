@@ -22,6 +22,7 @@ final class AppModel: ObservableObject {
     @Published var basePrompt = ""
     @Published var isRunning = false
     @Published var errorMessage: String?
+    @Published var detectedRuntimes: [RuntimeID: DetectedRuntime] = [:]
 
     private let paths = RiffPaths()
     private lazy var configStore = ConfigStore(paths: paths)
@@ -36,6 +37,7 @@ final class AppModel: ObservableObject {
             try configStore.bootstrap()
             basePrompt = try configStore.readBasePrompt()
             agents = try configStore.readAgents()
+            detectedRuntimes = await detectRuntimes()
             try reloadRows()
         } catch {
             errorMessage = String(describing: error)
@@ -114,8 +116,14 @@ final class AppModel: ObservableObject {
         let orchestrator = DebateOrchestrator(
             store: store,
             adapters: [
-                .claude: CLIRuntimeAdapter(definition: RuntimeDefinitions.claude),
-                .codex: CLIRuntimeAdapter(definition: RuntimeDefinitions.codex),
+                .claude: CLIRuntimeAdapter(
+                    definition: RuntimeDefinitions.claude,
+                    command: detectedRuntimes[.claude]?.command
+                ),
+                .codex: CLIRuntimeAdapter(
+                    definition: RuntimeDefinitions.codex,
+                    command: detectedRuntimes[.codex]?.command
+                ),
             ],
             baselinePrompt: basePrompt
         )
@@ -206,5 +214,14 @@ final class AppModel: ObservableObject {
             let store = ConversationStore(rootURL: url)
             return (try? store.readConversation()).map { ConversationLocation(id: $0.id, url: url) }
         }
+    }
+
+    private func detectRuntimes() async -> [RuntimeID: DetectedRuntime] {
+        let detector = RuntimeDetector()
+        let results = await [
+            detector.detect(RuntimeDefinitions.claude),
+            detector.detect(RuntimeDefinitions.codex),
+        ]
+        return Dictionary(uniqueKeysWithValues: results.map { ($0.id, $0) })
     }
 }
