@@ -114,7 +114,7 @@ struct ChatPaneView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 22, height: 22)
-                    .background(Theme.Color.surfaceOverlay)
+                    .background(Theme.Color.inputChipBackground)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -140,11 +140,11 @@ struct ChatPaneView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(Theme.Color.surfaceOverlay)
+        .background(Theme.Color.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Theme.Color.surfaceStroke, lineWidth: 1)
+                .stroke(Theme.Color.inputStroke, lineWidth: 1)
         )
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

@@ -41,12 +41,27 @@ enum Theme {
             dark: SwiftUI.Color.white.opacity(0.06)
         )
         static let surfaceOverlay = dynamic(
-            light: SwiftUI.Color.black.opacity(0.045),
+            light: SwiftUI.Color.black.opacity(0.06),
             dark: SwiftUI.Color.white.opacity(0.06)
         )
         static let surfaceStroke = dynamic(
-            light: SwiftUI.Color.black.opacity(0.10),
+            light: SwiftUI.Color.black.opacity(0.12),
             dark: SwiftUI.Color.white.opacity(0.08)
+        )
+        /// Stronger overlay reserved for primary inputs (composer, sidebar
+        /// search) that must always read as a distinct pill against the pane
+        /// background, even in light mode where weaker overlays disappear.
+        static let inputBackground = dynamic(
+            light: SwiftUI.Color(red: 0.93, green: 0.93, blue: 0.95),
+            dark: SwiftUI.Color.white.opacity(0.08)
+        )
+        static let inputStroke = dynamic(
+            light: SwiftUI.Color.black.opacity(0.10),
+            dark: SwiftUI.Color.white.opacity(0.10)
+        )
+        static let inputChipBackground = dynamic(
+            light: SwiftUI.Color(red: 0.84, green: 0.84, blue: 0.87),
+            dark: SwiftUI.Color.white.opacity(0.12)
         )
 
         static let secondary = SwiftUI.Color.secondary

@@ -14,6 +14,8 @@ BUNDLE_ID="com.riff.Riff"
 BUNDLE_VERSION="1"
 SHORT_VERSION="0.1.0"
 MIN_MACOS="15.0"
+ICON_FILE="AppIcon.icns"
+ICON_NAME="AppIcon"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_PATH="$PROJECT_DIR/$APP_NAME.app"
@@ -35,6 +37,7 @@ mkdir -p "$APP_PATH/Contents/MacOS"
 mkdir -p "$APP_PATH/Contents/Resources"
 
 cp "$BIN_PATH" "$APP_PATH/Contents/MacOS/$APP_NAME"
+cp "$PROJECT_DIR/Resources/$ICON_FILE" "$APP_PATH/Contents/Resources/$ICON_FILE"
 
 cat > "$APP_PATH/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +50,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
     <string>$APP_NAME</string>
     <key>CFBundleIdentifier</key>
     <string>$BUNDLE_ID</string>
+    <key>CFBundleIconFile</key>
+    <string>$ICON_NAME</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
