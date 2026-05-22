@@ -145,3 +145,16 @@ public struct ConversationLocation: Codable, Equatable, Identifiable, Sendable {
         self.url = url
     }
 }
+
+public struct ConversationFile: Codable, Equatable, Identifiable, Sendable {
+    public var id: String { relativePath }
+    public var relativePath: String
+    public var name: String
+    public var modifiedAt: Date?
+
+    public init(relativePath: String, name: String, modifiedAt: Date? = nil) {
+        self.relativePath = relativePath
+        self.name = name
+        self.modifiedAt = modifiedAt
+    }
+}
