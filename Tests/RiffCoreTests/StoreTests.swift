@@ -32,6 +32,17 @@ import Testing
     #expect(try ConfigStore(paths: paths).readBasePrompt() == "legacy prompt")
 }
 
+@Test func writeBasePromptPersistsPrompt() throws {
+    let root = try temporaryDirectory()
+    let paths = RiffPaths(homeURL: root)
+    let store = ConfigStore(paths: paths)
+
+    try store.bootstrap()
+    try store.writeBasePrompt("updated prompt")
+
+    #expect(try store.readBasePrompt() == "updated prompt")
+}
+
 @Test func creatingConversationWritesExpectedLayout() throws {
     let root = try temporaryDirectory().appending(path: "conversation", directoryHint: .isDirectory)
     let store = ConversationStore(rootURL: root)
@@ -64,6 +75,31 @@ import Testing
     #expect(file.relativePath == "files/turn-001.critic.codex.md")
     #expect(try store.readTextFile(relativePath: file.relativePath) == "# Details\n")
     #expect(try store.listMarkdownFiles().map(\.relativePath) == [file.relativePath])
+}
+
+@Test func forgettingConversationRemovesMatchingRecentLocation() throws {
+    let root = try temporaryDirectory()
+    let paths = RiffPaths(homeURL: root)
+    let store = ConfigStore(paths: paths)
+    try store.bootstrap()
+    let first = ConversationLocation(id: "c1", url: paths.defaultConversationURL(id: "c1"))
+    let second = ConversationLocation(id: "c2", url: paths.defaultConversationURL(id: "c2"))
+    try store.rememberConversation(first)
+    try store.rememberConversation(second)
+
+    try store.forgetConversation(first)
+
+    #expect(try store.readRecentConversations() == [second])
+}
+
+@Test func deletingConversationRemovesConversationDirectory() throws {
+    let root = try temporaryDirectory()
+    let store = ConversationStore(rootURL: root)
+    try store.create(sampleConversation())
+
+    try store.delete(moveToTrash: false)
+
+    #expect(!FileManager.default.fileExists(atPath: root.path))
 }
 
 private func sampleConversation() -> Conversation {

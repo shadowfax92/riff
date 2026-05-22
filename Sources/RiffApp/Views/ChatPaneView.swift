@@ -222,14 +222,10 @@ private struct MessageRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            if isUser {
-                Spacer(minLength: 60)
-                bubbleColumn
-            } else {
+            if !isUser {
                 avatar
-                bubbleColumn
-                Spacer(minLength: 60)
             }
+            bubbleColumn
         }
         .padding(.vertical, showHeader ? 6 : 1)
     }
@@ -257,10 +253,10 @@ private struct MessageRow: View {
                     .padding(.horizontal, 12)
             }
             bubble
-            if let warning = entry.warning {
-                Text(warning)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.orange)
+            if let wordCount = wordCountLabel {
+                Text(wordCount)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
                     .padding(.horizontal, 12)
             }
             ForEach(entry.attachments) { attachment in
@@ -268,18 +264,24 @@ private struct MessageRow: View {
                     .onTapGesture { Task { await openAttachment(attachment) } }
             }
         }
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
     }
 
     private var bubble: some View {
-        Text(entry.error ?? entry.text)
-            .font(.system(size: 14))
-            .foregroundStyle(isUser ? .white : .primary)
-            .textSelection(.enabled)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(bubbleColor)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
-            .frame(maxWidth: 520, alignment: isUser ? .trailing : .leading)
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                Text(paragraph)
+                    .font(.system(size: 14))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .foregroundStyle(isUser ? .white : .primary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(bubbleColor)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Metric.bubbleCorner, style: .continuous))
     }
 
     private var bubbleColor: Color {
@@ -287,6 +289,31 @@ private struct MessageRow: View {
             return Color.red.opacity(0.32)
         }
         return isUser ? Theme.Color.userBubble : Theme.Color.agentBubble
+    }
+
+    /// Splits the message on blank lines and parses each paragraph as
+    /// inline markdown — preserves whitespace so `**bold**`, `*italic*`,
+    /// and `` `code` `` render properly inside the bubble.
+    private var paragraphs: [AttributedString] {
+        let text = entry.error ?? entry.text
+        let options = AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        )
+        return text.components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { paragraph in
+                (try? AttributedString(markdown: paragraph, options: options))
+                    ?? AttributedString(paragraph)
+            }
+    }
+
+    /// User and error bubbles get no word count — only normal agent turns.
+    private var wordCountLabel: String? {
+        guard !isUser, entry.error == nil else { return nil }
+        let count = entry.text.split(whereSeparator: \.isWhitespace).count
+        guard count > 0 else { return nil }
+        return "\(count) words"
     }
 
     /// Tapping an inline attachment selects that file in the artifacts pane
