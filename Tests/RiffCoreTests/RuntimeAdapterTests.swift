@@ -1,0 +1,106 @@
+import Foundation
+import Testing
+@testable import RiffCore
+
+@Test func claudeFreshTurnsUseStreamJSONAndBypassPermissions() {
+    let request = RuntimeInvocationRequest(
+        cwd: URL(fileURLWithPath: "/tmp/riff"),
+        options: RuntimeBuildOptions(model: "sonnet"),
+        stdin: "prompt"
+    )
+
+    let invocation = RuntimeDefinitions.claude.buildInvocation(request)
+
+    #expect(invocation.arguments.contains("-p"))
+    #expect(invocation.arguments.contains("--output-format"))
+    #expect(invocation.arguments.contains("stream-json"))
+    #expect(invocation.arguments.contains("--permission-mode"))
+    #expect(invocation.arguments.contains("bypassPermissions"))
+    #expect(invocation.arguments.contains("--add-dir"))
+    #expect(invocation.arguments.contains("/tmp/riff"))
+    #expect(!invocation.arguments.contains("--resume"))
+    #expect(invocation.stdin == "prompt")
+}
+
+@Test func claudeResumeIncludesSessionAndKeepsPromptOnStdin() {
+    let request = RuntimeInvocationRequest(
+        sessionID: "claude-session",
+        cwd: URL(fileURLWithPath: "/tmp/riff"),
+        stdin: "delta"
+    )
+
+    let invocation = RuntimeDefinitions.claude.buildInvocation(request)
+
+    #expect(hasPair(invocation.arguments, "--resume", "claude-session"))
+    #expect(invocation.stdin == "delta")
+}
+
+@Test func codexFreshTurnsUsePermissiveExecInConversationRoot() {
+    let request = RuntimeInvocationRequest(
+        cwd: URL(fileURLWithPath: "/tmp/riff"),
+        allowedDirectories: [URL(fileURLWithPath: "/tmp/extra")],
+        options: RuntimeBuildOptions(model: "gpt-5.4", reasoning: "high"),
+        stdin: "prompt"
+    )
+
+    let invocation = RuntimeDefinitions.codex.buildInvocation(request)
+
+    #expect(invocation.arguments.starts(with: ["exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]))
+    #expect(hasPair(invocation.arguments, "-C", "/tmp/riff"))
+    #expect(hasPair(invocation.arguments, "--add-dir", "/tmp/extra"))
+    #expect(hasPair(invocation.arguments, "--model", "gpt-5.4"))
+    #expect(hasPair(invocation.arguments, "-c", "model_reasoning_effort=\"high\""))
+    #expect(!invocation.arguments.contains("-"))
+}
+
+@Test func codexResumeUsesResumeSubcommandAndStdinSentinel() {
+    let request = RuntimeInvocationRequest(
+        sessionID: "codex-session",
+        cwd: URL(fileURLWithPath: "/tmp/riff"),
+        stdin: "delta"
+    )
+
+    let invocation = RuntimeDefinitions.codex.buildInvocation(request)
+
+    #expect(invocation.arguments.starts(with: ["exec", "resume", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]))
+    #expect(invocation.arguments.suffix(2) == ["codex-session", "-"])
+}
+
+@Test func runtimeDetectionTriesFallbackBinaryAndKeepsFallbackModels() async {
+    let client = FakeProcessClient(results: [
+        "claude --version": ProcessResult(stdout: "", exitCode: 127),
+        "openclaude --version": ProcessResult(stdout: "2.0.0\n"),
+    ])
+    let detector = RuntimeDetector(processClient: client)
+
+    let detected = await detector.detect(RuntimeDefinitions.claude)
+
+    #expect(detected.available)
+    #expect(detected.command == "openclaude")
+    #expect(detected.models.contains { $0.id == "sonnet" })
+}
+
+@Test func codexDebugModelsParserSkipsHiddenModels() {
+    let models = parseCodexDebugModels("""
+    {"models":[{"slug":"gpt-5.4","display_name":"GPT 5.4"},{"slug":"secret","visibility":"hidden"}]}
+    """)
+
+    #expect(models?.map(\.id) == ["default", "gpt-5.4"])
+}
+
+private func hasPair(_ args: [String], _ key: String, _ value: String) -> Bool {
+    zip(args, args.dropFirst()).contains { $0 == key && $1 == value }
+}
+
+private actor FakeProcessClient: ProcessClient {
+    var results: [String: ProcessResult]
+
+    init(results: [String: ProcessResult]) {
+        self.results = results
+    }
+
+    func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {
+        let key = ([invocation.command] + invocation.arguments).joined(separator: " ")
+        return results[key] ?? ProcessResult(stdout: "", exitCode: 1)
+    }
+}
