@@ -11,11 +11,14 @@ SHORT_VERSION := 0.1.0
 BIN_PATH := .build/$(CONFIG)/$(APP_NAME)
 SHELL := /bin/bash
 
-.PHONY: all build app install open test clean
+.PHONY: all build app icon install open test clean
 
 all: build
 
 build: app
+
+icon:
+	@./scripts/regenerate-icon.sh
 
 app: Resources/$(ICON_FILE)
 	@set -euo pipefail; \
