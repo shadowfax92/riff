@@ -23,11 +23,13 @@ final class AppModel: ObservableObject {
     @Published var activeTurn: ActiveTurnState?
     @Published var errorMessage: String?
     @Published var detectedRuntimes: [RuntimeID: DetectedRuntime] = [:]
+    @Published var runtimeSettings = RuntimeSettings()
 
     private let paths = RiffPaths()
     private lazy var configStore = ConfigStore(paths: paths)
 
     var basePromptURL: URL { configStore.basePromptURL }
+    var runtimeSettingsURL: URL { configStore.runtimeSettingsURL }
 
     /// Re-reads the base prompt from disk so the UI shows fresh content
     /// after the user opens and edits the markdown file externally.
@@ -48,6 +50,7 @@ final class AppModel: ObservableObject {
         do {
             try configStore.bootstrap()
             basePrompt = try configStore.readBasePrompt()
+            runtimeSettings = try configStore.readRuntimeSettings()
             detectedRuntimes = await detectRuntimes()
             try reloadRows()
         } catch {
@@ -132,16 +135,19 @@ final class AppModel: ObservableObject {
         }
         isRunning = true
         let store = ConversationStore(rootURL: location.url)
+        let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
         let orchestrator = DebateOrchestrator(
             store: store,
             adapters: [
                 .claude: CLIRuntimeAdapter(
                     definition: RuntimeDefinitions.claude,
-                    command: detectedRuntimes[.claude]?.command
+                    command: detectedRuntimes[.claude]?.command,
+                    processClient: processClient
                 ),
                 .codex: CLIRuntimeAdapter(
                     definition: RuntimeDefinitions.codex,
-                    command: detectedRuntimes[.codex]?.command
+                    command: detectedRuntimes[.codex]?.command,
+                    processClient: processClient
                 ),
             ],
             baselinePrompt: basePrompt,
@@ -183,6 +189,27 @@ final class AppModel: ObservableObject {
 
     func stopSelectedConversation() async {
         await runningOrchestrator?.stop()
+    }
+
+    /// Persists the user-provided CLI PATH and immediately re-runs runtime
+    /// detection so settings changes are reflected before the next debate.
+    func saveRuntimeSettings(cliPath: String) async {
+        do {
+            let settings = RuntimeSettings(cliPath: cliPath)
+            try configStore.writeRuntimeSettings(settings)
+            runtimeSettings = settings
+            detectedRuntimes = await detectRuntimes()
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
+    func resetRuntimeSettings() async {
+        await saveRuntimeSettings(cliPath: RuntimeSettings.defaultCLIPath())
+    }
+
+    func refreshRuntimes() async {
+        detectedRuntimes = await detectRuntimes()
     }
 
     func reloadSelected() async {
@@ -253,7 +280,7 @@ final class AppModel: ObservableObject {
     }
 
     private func detectRuntimes() async -> [RuntimeID: DetectedRuntime] {
-        let detector = RuntimeDetector()
+        let detector = RuntimeDetector(processClient: FoundationProcessClient(environment: runtimeSettings.processEnvironment))
         let results = await [
             detector.detect(RuntimeDefinitions.claude),
             detector.detect(RuntimeDefinitions.codex),

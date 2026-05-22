@@ -43,7 +43,11 @@ public enum ProcessClientError: Error, Equatable {
 }
 
 public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
-    public init() {}
+    private let environment: [String: String]?
+
+    public init(environment: [String: String]? = nil) {
+        self.environment = environment
+    }
 
     public func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {
         try await withCheckedThrowingContinuation { continuation in
@@ -56,6 +60,7 @@ public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
                 process.arguments = [invocation.command] + invocation.arguments
             }
             process.currentDirectoryURL = invocation.workingDirectory
+            process.environment = environment
 
             let stdout = Pipe()
             let stderr = Pipe()

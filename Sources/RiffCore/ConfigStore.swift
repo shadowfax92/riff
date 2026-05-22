@@ -15,6 +15,10 @@ public struct ConfigStore: Sendable {
         paths.configURL.appending(path: "recent-conversations.json")
     }
 
+    public var runtimeSettingsURL: URL {
+        paths.configURL.appending(path: "runtime.json")
+    }
+
     /// Creates the baseline Riff config files used by new debates while
     /// preserving the user-edited shared prompt. Also migrates the old
     /// `~/.riff/configs/prompt.md` layout into `~/.riff/config/base_prompt.md`
@@ -30,10 +34,24 @@ public struct ConfigStore: Sendable {
         if !fm.fileExists(atPath: recentConversationsURL.path) {
             try RiffJSON.write([ConversationLocation](), to: recentConversationsURL)
         }
+        if !fm.fileExists(atPath: runtimeSettingsURL.path) {
+            try writeRuntimeSettings(RuntimeSettings())
+        }
     }
 
     public func readBasePrompt() throws -> String {
         try String(contentsOf: basePromptURL, encoding: .utf8)
+    }
+
+    public func readRuntimeSettings() throws -> RuntimeSettings {
+        if !FileManager.default.fileExists(atPath: runtimeSettingsURL.path) {
+            return RuntimeSettings()
+        }
+        return try RiffJSON.read(RuntimeSettings.self, from: runtimeSettingsURL)
+    }
+
+    public func writeRuntimeSettings(_ settings: RuntimeSettings) throws {
+        try RiffJSON.write(settings, to: runtimeSettingsURL)
     }
 
     public func readRecentConversations() throws -> [ConversationLocation] {

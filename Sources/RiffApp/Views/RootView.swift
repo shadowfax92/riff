@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showingNewConversation = false
+    @State private var showingSettings = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("riff.showFilesPane") private var showFilesPane = true
     @AppStorage("riff.appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
@@ -26,6 +27,10 @@ struct RootView: View {
             NewConversationSheet()
                 .environmentObject(model)
         }
+        .sheet(isPresented: $showingSettings) {
+            SettingsSheet()
+                .environmentObject(model)
+        }
         .alert("Riff Error", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -41,6 +46,15 @@ struct RootView: View {
 
     @ToolbarContentBuilder
     private var chatToolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                showingSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .foregroundStyle(.secondary)
+            }
+            .help("Settings")
+        }
         ToolbarItem(placement: .primaryAction) {
             Button {
                 cycleAppearance()

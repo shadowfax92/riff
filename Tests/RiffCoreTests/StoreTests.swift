@@ -9,9 +9,11 @@ import Testing
 
     try store.bootstrap()
     try "custom prompt".write(to: store.basePromptURL, atomically: true, encoding: .utf8)
+    try store.writeRuntimeSettings(RuntimeSettings(cliPath: "/custom/bin:/usr/bin"))
     try store.bootstrap()
 
     #expect(try store.readBasePrompt() == "custom prompt")
+    #expect(try store.readRuntimeSettings().cliPath == "/custom/bin:/usr/bin")
     #expect(!FileManager.default.fileExists(atPath: paths.configURL.appending(path: "agents.json").path))
 }
 
