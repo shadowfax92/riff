@@ -5,4 +5,5 @@ DerivedData/
 *.xcuserdata/
 *.xcuserstate
 Riff.app/
+Riff-*.dmg
 .DS_Store
