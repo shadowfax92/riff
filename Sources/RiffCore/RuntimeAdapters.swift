@@ -109,9 +109,9 @@ public enum RuntimePromptBuilder {
         var parts: [String] = []
         if includeInstructions {
             parts.append(request.baselinePrompt.trimmingCharacters(in: .whitespacesAndNewlines))
-            parts.append("You are \(request.agent.name). Role: \(request.agent.role).")
+            parts.append("ROLE_NAME:\n\(request.agent.name)")
             if !request.agent.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                parts.append("Agent instructions:\n\(request.agent.instructions)")
+                parts.append("ROLE_PROMPT:\n\(request.agent.instructions)")
             }
             parts.append("""
             Response contract:

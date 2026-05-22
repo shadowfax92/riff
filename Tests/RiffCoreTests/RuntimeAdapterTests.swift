@@ -114,6 +114,30 @@ import Testing
     #expect(await client.commands() == ["openclaude"])
 }
 
+@Test func freshRuntimePromptUsesRoleNameAndRolePromptLabels() {
+    let prompt = RuntimePromptBuilder.prompt(
+        for: RuntimeTurnRequest(
+            agent: AgentProfile(
+                id: "security",
+                name: "Security",
+                role: "Security",
+                runtime: .codex,
+                instructions: "Pressure-test trust boundaries."
+            ),
+            conversationRoot: URL(fileURLWithPath: "/tmp/riff"),
+            baselinePrompt: "base prompt",
+            conversationPrompt: "debate this",
+            context: "",
+            attachmentPath: "files/turn-001.security.codex.md"
+        ),
+        includeInstructions: true
+    )
+
+    #expect(prompt.contains("base prompt"))
+    #expect(prompt.contains("ROLE_NAME:\nSecurity"))
+    #expect(prompt.contains("ROLE_PROMPT:\nPressure-test trust boundaries."))
+}
+
 private func hasPair(_ args: [String], _ key: String, _ value: String) -> Bool {
     zip(args, args.dropFirst()).contains { $0 == key && $1 == value }
 }

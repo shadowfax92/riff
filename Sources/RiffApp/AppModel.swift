@@ -18,7 +18,6 @@ final class AppModel: ObservableObject {
     @Published var files: [ConversationFile] = []
     @Published var selectedFile: ConversationFile?
     @Published var selectedMarkdown = ""
-    @Published var agents: [AgentProfile] = []
     @Published var basePrompt = ""
     @Published var isRunning = false
     @Published var errorMessage: String?
@@ -36,7 +35,6 @@ final class AppModel: ObservableObject {
         do {
             try configStore.bootstrap()
             basePrompt = try configStore.readBasePrompt()
-            agents = try configStore.readAgents()
             detectedRuntimes = await detectRuntimes()
             try reloadRows()
         } catch {
@@ -52,8 +50,16 @@ final class AppModel: ObservableObject {
 
     /// Creates a file-backed conversation either in the default Riff root or
     /// in a folder the user selected from the macOS file picker.
-    func createConversation(title: String, prompt: String, maxRounds: Int, customFolder: URL?) async {
+    func createConversation(title: String, prompt: String, maxRounds: Int, customFolder: URL?, roleDrafts: [RoleDraft]) async {
         do {
+            let agents = roleDrafts
+                .filter(\.isValid)
+                .enumerated()
+                .map { offset, draft in draft.agentProfile(index: offset + 1) }
+            guard !agents.isEmpty else {
+                errorMessage = "Add at least one role with ROLE_NAME and ROLE_PROMPT."
+                return
+            }
             let id = RiffPathFormat.newConversationID()
             let root = customFolder ?? paths.defaultConversationURL(id: id)
             let conversation = Conversation(

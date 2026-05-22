@@ -20,3 +20,35 @@ import Testing
 
     #expect(filename == "turn-003.lead-critic.claude.md")
 }
+
+@Test func roleDraftCreatesAgentProfileFromRoleNameAndPrompt() {
+    let draft = RoleDraft(
+        id: "role-1",
+        roleName: "Security",
+        rolePrompt: "Pressure-test the threat model.",
+        runtime: .codex,
+        model: "gpt-5",
+        reasoning: "high"
+    )
+
+    let agent = draft.agentProfile(index: 1)
+
+    #expect(agent.id == "role-1")
+    #expect(agent.name == "Security")
+    #expect(agent.role == "Security")
+    #expect(agent.runtime == .codex)
+    #expect(agent.model == "gpt-5")
+    #expect(agent.reasoning == "high")
+    #expect(agent.instructions == "Pressure-test the threat model.")
+}
+
+@Test func roleDraftWithoutNameOrPromptIsInvalid() {
+    let draft = RoleDraft(
+        id: "role-1",
+        roleName: " ",
+        rolePrompt: " ",
+        runtime: .claude
+    )
+
+    #expect(!draft.isValid)
+}

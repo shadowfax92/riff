@@ -41,6 +41,54 @@ public struct AgentProfile: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
+    public var id: String
+    public var roleName: String
+    public var rolePrompt: String
+    public var runtime: RuntimeID
+    public var model: String
+    public var reasoning: String?
+
+    public init(
+        id: String,
+        roleName: String,
+        rolePrompt: String,
+        runtime: RuntimeID,
+        model: String = "default",
+        reasoning: String? = nil
+    ) {
+        self.id = id
+        self.roleName = roleName
+        self.rolePrompt = rolePrompt
+        self.runtime = runtime
+        self.model = model
+        self.reasoning = reasoning
+    }
+
+    public var isValid: Bool {
+        !roleName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !rolePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Converts an on-the-fly role into the persisted agent profile used by
+    /// conversations and runtime adapters.
+    public func agentProfile(index: Int) -> AgentProfile {
+        let name = roleName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let instructions = rolePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanReasoning = reasoning?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return AgentProfile(
+            id: id.isEmpty ? "role-\(index)" : id,
+            name: name.isEmpty ? "Role \(index)" : name,
+            role: name.isEmpty ? "Role \(index)" : name,
+            runtime: runtime,
+            model: cleanModel.isEmpty ? "default" : cleanModel,
+            reasoning: cleanReasoning?.isEmpty == true ? nil : cleanReasoning,
+            instructions: instructions
+        )
+    }
+}
+
 public struct Conversation: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var title: String

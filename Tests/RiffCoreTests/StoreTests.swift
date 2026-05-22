@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import RiffCore
 
-@Test func bootstrapCreatesPromptAndAgentsWithoutOverwriting() throws {
+@Test func bootstrapCreatesPromptWithoutCreatingFixedAgents() throws {
     let root = try temporaryDirectory()
     let paths = RiffPaths(homeURL: root)
     let store = ConfigStore(paths: paths)
@@ -12,7 +12,7 @@ import Testing
     try store.bootstrap()
 
     #expect(try store.readBasePrompt() == "custom prompt")
-    #expect(try store.readAgents().map(\.runtime) == [.claude, .codex])
+    #expect(!FileManager.default.fileExists(atPath: paths.configsURL.appending(path: "agents.json").path))
 }
 
 @Test func creatingConversationWritesExpectedLayout() throws {
