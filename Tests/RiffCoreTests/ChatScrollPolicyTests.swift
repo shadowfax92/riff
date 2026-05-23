@@ -42,3 +42,11 @@ import Testing
 
     #expect(first == second)
 }
+
+@Test func agentOnlyDebatesPinSizeChangesToTop() {
+    #expect(ChatScrollPolicy.pinsSizeChangesToTop(hasUserMessages: false))
+}
+
+@Test func humanChatsUsePlatformSizeChangeAnchor() {
+    #expect(!ChatScrollPolicy.pinsSizeChangesToTop(hasUserMessages: true))
+}

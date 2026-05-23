@@ -111,6 +111,8 @@ struct ChatPaneView: View {
                 .padding(.vertical, 16)
             }
             .id(ChatScrollPolicy.containerIdentity(selectedConversationID: model.selectedID))
+            .defaultScrollAnchor(.top, for: .initialOffset)
+            .defaultScrollAnchor(sizeChangeAnchor, for: .sizeChanges)
             .onChange(of: model.transcript.count) {
                 let newCount = model.transcript.count
                 let target = ChatScrollPolicy.target(
@@ -141,6 +143,11 @@ struct ChatPaneView: View {
                 lastTranscriptCount = model.transcript.count
             }
         }
+    }
+
+    private var sizeChangeAnchor: UnitPoint? {
+        let hasUserMessages = model.transcript.contains { $0.speakerID == "user" }
+        return ChatScrollPolicy.pinsSizeChangesToTop(hasUserMessages: hasUserMessages) ? .top : nil
     }
 
     private var composerArea: some View {

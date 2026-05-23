@@ -19,6 +19,14 @@ public enum ChatScrollPolicy {
         return "conversation:\(selectedConversationID)"
     }
 
+    /// Agent-only debates start with CLI output rather than a human message.
+    /// While those runs are in flight, new committed rows and the live thinking
+    /// row should keep the top context visible instead of inheriting a lower
+    /// viewport offset.
+    public static func pinsSizeChangesToTop(hasUserMessages: Bool) -> Bool {
+        !hasUserMessages
+    }
+
     /// Decides when the chat should jump to the latest row. Agent turns do not
     /// force-scroll because that hides early debate context during fresh runs.
     public static func target(for event: ChatScrollEvent) -> ChatScrollTarget? {
