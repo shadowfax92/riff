@@ -50,6 +50,34 @@ public struct ClaudeRuntimeHarness: RuntimeHarness {
     }
 
     public func parseResult(stdout: String) -> RuntimeTurnResult {
-        RuntimeStreamParser.parseClaude(stdout)
+        var textParts: [String] = []
+        var resultText = ""
+        var sessionID: String?
+        var model = ""
+        for object in RuntimeOutputParsing.parseJSONLines(stdout) {
+            let type = object["type"] as? String
+            if type == "system", object["subtype"] as? String == "init" {
+                sessionID = object["session_id"] as? String ?? sessionID
+                model = object["model"] as? String ?? model
+            } else if type == "assistant",
+                      let message = object["message"] as? [String: Any],
+                      let content = message["content"] as? [[String: Any]] {
+                for block in content where block["type"] as? String == "text" {
+                    if let text = block["text"] as? String {
+                        textParts.append(text)
+                    }
+                }
+            } else if type == "result" {
+                resultText = object["result"] as? String ?? resultText
+                sessionID = object["session_id"] as? String ?? sessionID
+                model = object["model"] as? String ?? model
+            }
+        }
+        let text = resultText.isEmpty ? textParts.joined() : resultText
+        return RuntimeTurnResult(
+            text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+            sessionID: sessionID,
+            model: model
+        )
     }
 }

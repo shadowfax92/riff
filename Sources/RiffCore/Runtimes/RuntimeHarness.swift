@@ -1,3 +1,5 @@
+import Foundation
+
 /// Runtime-specific CLI behavior behind the shared `RuntimeDefinition`
 /// facade. Add new CLI runtimes by implementing this protocol instead of
 /// expanding switches in adapters.
@@ -20,4 +22,26 @@ public protocol RuntimeHarness: Sendable {
 
 public extension RuntimeHarness {
     var listModelsArguments: [String]? { nil }
+}
+
+enum RuntimeOutputParsing {
+    static func parseJSONLines(_ stdout: String) -> [[String: Any]] {
+        stdout
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .compactMap { line in
+                guard let data = String(line).data(using: .utf8) else {
+                    return nil
+                }
+                return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            }
+    }
+
+    static func firstString(_ object: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = object[key] as? String, !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
 }

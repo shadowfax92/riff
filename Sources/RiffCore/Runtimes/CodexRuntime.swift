@@ -54,7 +54,33 @@ public struct CodexRuntimeHarness: RuntimeHarness {
     }
 
     public func parseResult(stdout: String) -> RuntimeTurnResult {
-        RuntimeStreamParser.parseCodex(stdout)
+        var text = ""
+        var sessionID: String?
+        var model = ""
+        for rawObject in RuntimeOutputParsing.parseJSONLines(stdout) {
+            let object = rawObject["msg"] as? [String: Any] ?? rawObject
+            let type = object["type"] as? String ?? ""
+            sessionID = RuntimeOutputParsing.firstString(
+                object,
+                keys: ["session_id", "sessionId", "conversation_id", "thread_id"]
+            ) ?? sessionID
+            model = object["model"] as? String ?? model
+            if type == "agent_message_delta", let delta = object["delta"] as? String {
+                text += delta
+            } else if type == "agent_message", let message = object["message"] as? String {
+                text = message
+            } else if type.contains("session") {
+                sessionID = RuntimeOutputParsing.firstString(
+                    object,
+                    keys: ["session_id", "sessionId", "conversation_id", "thread_id", "id"]
+                ) ?? sessionID
+            }
+        }
+        return RuntimeTurnResult(
+            text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+            sessionID: sessionID,
+            model: model
+        )
     }
 
     private func appendOptions(to args: inout [String], options: RuntimeBuildOptions) {
