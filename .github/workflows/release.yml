@@ -61,13 +61,5 @@ jobs:
             ## Install
 
             Mount the DMG and drag **Riff** to **Applications**.
-
-            > Riff is ad-hoc signed, not notarized. On first launch macOS will
-            > refuse to open it. Either right-click the app → **Open**, then
-            > confirm in the dialog, or run:
-            >
-            > ```sh
-            > xattr -dr com.apple.quarantine /Applications/Riff.app
-            > ```
           draft: false
           prerelease: false
