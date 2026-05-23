@@ -75,6 +75,7 @@ final class AppModel: ObservableObject {
         }
     }
     private var selectedLocation: ConversationLocation?
+    private var uiOnlySummaries = UIOnlySummaryStore()
     private var runningOrchestrators: [String: DebateOrchestrator] = [:]
     private var runTasks: [String: Task<Void, Never>] = [:]
 
@@ -326,14 +327,12 @@ final class AppModel: ObservableObject {
                 self.updateRunRegistry { $0.finish(conversationID: conversationID) }
                 self.runningOrchestrators[conversationID] = nil
                 self.runTasks[conversationID] = nil
-            }
-            await MainActor.run {
+                if let summaryEntry {
+                    self.uiOnlySummaries.set(summaryEntry, for: conversationID)
+                }
                 self.reloadConversationFromDiskIfSelected(location)
+                try? self.reloadRows()
             }
-            if let summaryEntry, self.selectedID == location.id {
-                self.transcript.append(summaryEntry)
-            }
-            try? self.reloadRows()
         }
     }
 
@@ -394,10 +393,10 @@ final class AppModel: ObservableObject {
                 return
             }
             self.setSummarizing(false, conversationID: conversationID)
-            self.reloadConversationFromDiskIfSelected(location)
-            if let summaryEntry, self.selectedID == conversationID {
-                self.transcript.append(summaryEntry)
+            if let summaryEntry {
+                self.uiOnlySummaries.set(summaryEntry, for: conversationID)
             }
+            self.reloadConversationFromDiskIfSelected(location)
             try? self.reloadRows()
         }
     }
@@ -422,6 +421,7 @@ final class AppModel: ObservableObject {
             let wasSelected = selectedID == row.id
             try ConversationStore(rootURL: row.location.url).delete()
             try configStore.forgetConversation(row.location)
+            uiOnlySummaries.remove(for: row.id)
             try reloadRows()
             if wasSelected {
                 clearSelection()
@@ -507,7 +507,8 @@ final class AppModel: ObservableObject {
         do {
             let store = ConversationStore(rootURL: location.url)
             selectedConversation = try store.readConversation()
-            transcript = try store.readTranscriptWithExistingAttachments()
+            let diskTranscript = try store.readTranscriptWithExistingAttachments()
+            transcript = uiOnlySummaries.merged(with: diskTranscript, conversationID: location.id)
             files = try store.listMarkdownFiles()
             if let selectedFile, files.contains(selectedFile) {
                 self.selectedFile = selectedFile

@@ -35,5 +35,9 @@ let package = Package(
             name: "RiffCoreTests",
             dependencies: ["RiffCore"]
         ),
+        .testTarget(
+            name: "RiffAppTests",
+            dependencies: ["RiffApp"]
+        ),
     ]
 )
