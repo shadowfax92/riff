@@ -1,4 +1,5 @@
 public enum ChatScrollTarget: Equatable, Sendable {
+    case top
     case bottom
 }
 
@@ -15,7 +16,13 @@ public enum ChatScrollPolicy {
         case .selectedConversationChanged:
             return .bottom
         case .transcriptAppended(let previousCount, let currentCount, let latestSpeakerID):
-            guard currentCount > previousCount, latestSpeakerID == "user" else {
+            guard currentCount > previousCount else {
+                return nil
+            }
+            if previousCount == 0, latestSpeakerID != "user" {
+                return .top
+            }
+            guard latestSpeakerID == "user" else {
                 return nil
             }
             return .bottom

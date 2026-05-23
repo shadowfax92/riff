@@ -89,6 +89,7 @@ struct ChatPaneView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 4) {
+                    Color.clear.frame(height: 1).id("__top__")
                     let groups = MessageGrouping.group(entries: model.transcript)
                     ForEach(groups) { group in
                         switch group {
@@ -119,7 +120,9 @@ struct ChatPaneView: View {
                     )
                 )
                 lastTranscriptCount = newCount
-                if target == .bottom {
+                if target == .top {
+                    scrollToTop(proxy, animated: false)
+                } else if target == .bottom {
                     scrollToBottom(proxy, animated: true)
                 }
             }
@@ -252,6 +255,16 @@ struct ChatPaneView: View {
             }
         } else {
             proxy.scrollTo("__bottom__", anchor: .bottom)
+        }
+    }
+
+    private func scrollToTop(_ proxy: ScrollViewProxy, animated: Bool) {
+        if animated {
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo("__top__", anchor: .top)
+            }
+        } else {
+            proxy.scrollTo("__top__", anchor: .top)
         }
     }
 }

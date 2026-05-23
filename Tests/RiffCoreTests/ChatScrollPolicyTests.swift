@@ -1,9 +1,17 @@
 import Testing
 @testable import RiffCore
 
-@Test func agentAppendDoesNotForceChatToBottom() {
+@Test func firstAgentAppendScrollsChatToTop() {
     let target = ChatScrollPolicy.target(
         for: .transcriptAppended(previousCount: 0, currentCount: 1, latestSpeakerID: "fox")
+    )
+
+    #expect(target == .top)
+}
+
+@Test func laterAgentAppendDoesNotForceChatToBottom() {
+    let target = ChatScrollPolicy.target(
+        for: .transcriptAppended(previousCount: 1, currentCount: 2, latestSpeakerID: "fox")
     )
 
     #expect(target == nil)
