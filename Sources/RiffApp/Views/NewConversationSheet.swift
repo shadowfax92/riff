@@ -12,16 +12,7 @@ struct NewConversationSheet: View {
     @State private var supportFolders: [URL] = []
     @State private var choosingSupportFolder = false
     @State private var roleDrafts: [RoleDraft] = {
-        let identity = RoleNameGenerator.generate()
-        return [
-            RoleDraft(
-                id: UUID().uuidString.lowercased(),
-                roleName: identity.name,
-                rolePrompt: "",
-                runtime: .claude,
-                emoji: identity.emoji
-            )
-        ]
+        [RoleDraftFactory.initial()]
     }()
 
     init(onOpenSettings: @escaping () -> Void = {}) {
@@ -296,16 +287,7 @@ struct NewConversationSheet: View {
     }
 
     private func addRole() {
-        let runtime: RuntimeID = roleDrafts.last?.runtime == .claude ? .codex : .claude
-        let identity = RoleNameGenerator.generate()
-        roleDrafts.append(RoleDraft(
-            id: UUID().uuidString.lowercased(),
-            roleName: identity.name,
-            rolePrompt: "",
-            runtime: runtime,
-            reasoning: runtime == .codex ? "medium" : nil,
-            emoji: identity.emoji
-        ))
+        roleDrafts.append(RoleDraftFactory.additional(after: roleDrafts.last))
     }
 
     private func removeRole(_ id: String) {
