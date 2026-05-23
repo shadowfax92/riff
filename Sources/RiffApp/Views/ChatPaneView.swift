@@ -1,3 +1,5 @@
+import CryptoKit
+import Foundation
 import MarkdownUI
 import RiffCore
 import SwiftUI
@@ -93,11 +95,10 @@ struct ChatPaneView: View {
                     let groups = MessageGrouping.group(entries: model.transcript)
                     ForEach(groups) { group in
                         switch group {
-                        case .dateDivider(let id, let date):
-                            DateDivider(date: date).id(id)
-                        case .message(let entry, let showHeader):
+                        case .dateDivider(_, let date):
+                            DateDivider(date: date)
+                        case .message(_, let entry, let showHeader):
                             MessageRow(entry: entry, showHeader: showHeader)
-                                .id(entry.id)
                         }
                     }
                     if let active = model.selectedActiveTurn {
@@ -595,12 +596,12 @@ private struct ThinkingIndicator: View {
 /// when the speaker changes or after a gap.
 enum MessageGroup: Identifiable {
     case dateDivider(id: String, date: Date)
-    case message(TranscriptEntry, showHeader: Bool)
+    case message(id: String, TranscriptEntry, showHeader: Bool)
 
     var id: String {
         switch self {
         case .dateDivider(let id, _): return "divider-\(id)"
-        case .message(let entry, _): return entry.id
+        case .message(let id, _, _): return "message-\(id)"
         }
     }
 }
@@ -609,7 +610,8 @@ enum MessageGrouping {
     static func group(entries: [TranscriptEntry]) -> [MessageGroup] {
         var result: [MessageGroup] = []
         var lastEntry: TranscriptEntry?
-        for entry in entries {
+        for (index, entry) in entries.enumerated() {
+            let renderID = generateID(for: entry, index: index)
             let needsDivider: Bool
             if let last = lastEntry {
                 needsDivider = entry.startedAt.timeIntervalSince(last.startedAt) > 600
@@ -617,7 +619,7 @@ enum MessageGrouping {
                 needsDivider = true
             }
             if needsDivider {
-                result.append(.dateDivider(id: entry.id, date: entry.startedAt))
+                result.append(.dateDivider(id: renderID, date: entry.startedAt))
             }
             let showHeader: Bool
             if let last = lastEntry, !needsDivider {
@@ -625,9 +627,18 @@ enum MessageGrouping {
             } else {
                 showHeader = true
             }
-            result.append(.message(entry, showHeader: showHeader))
+            result.append(.message(id: renderID, entry, showHeader: showHeader))
             lastEntry = entry
         }
         return result
+    }
+
+    static func generateID(for entry: TranscriptEntry, index: Int) -> String {
+        let milliseconds = Int64((entry.startedAt.timeIntervalSince1970 * 1000).rounded())
+        let seed = "\(index)|\(entry.id)|\(entry.turn)|\(entry.round)|\(entry.speakerID)|\(milliseconds)"
+        return SHA256.hash(data: Data(seed.utf8))
+            .prefix(5)
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }
