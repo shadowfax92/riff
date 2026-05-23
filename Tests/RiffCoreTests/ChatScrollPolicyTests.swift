@@ -25,8 +25,12 @@ import Testing
     #expect(target == .bottom)
 }
 
-@Test func selectionChangeScrollsChatToBottom() {
-    #expect(ChatScrollPolicy.target(for: .selectedConversationChanged) == .bottom)
+@Test func agentOnlySelectionChangeScrollsChatToTop() {
+    #expect(ChatScrollPolicy.target(for: .selectedConversationChanged(hasUserMessages: false)) == .top)
+}
+
+@Test func humanSelectionChangeScrollsChatToBottom() {
+    #expect(ChatScrollPolicy.target(for: .selectedConversationChanged(hasUserMessages: true)) == .bottom)
 }
 
 @Test func scrollContainerIdentityChangesWithSelectedConversation() {

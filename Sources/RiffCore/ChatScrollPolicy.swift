@@ -4,7 +4,7 @@ public enum ChatScrollTarget: Equatable, Sendable {
 }
 
 public enum ChatScrollEvent: Equatable, Sendable {
-    case selectedConversationChanged
+    case selectedConversationChanged(hasUserMessages: Bool)
     case transcriptAppended(previousCount: Int, currentCount: Int, latestSpeakerID: String?)
 }
 
@@ -31,8 +31,8 @@ public enum ChatScrollPolicy {
     /// force-scroll because that hides early debate context during fresh runs.
     public static func target(for event: ChatScrollEvent) -> ChatScrollTarget? {
         switch event {
-        case .selectedConversationChanged:
-            return .bottom
+        case .selectedConversationChanged(let hasUserMessages):
+            return hasUserMessages ? .bottom : .top
         case .transcriptAppended(let previousCount, let currentCount, let latestSpeakerID):
             guard currentCount > previousCount else {
                 return nil

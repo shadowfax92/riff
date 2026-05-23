@@ -130,13 +130,17 @@ struct ChatPaneView: View {
                 }
             }
             .onChange(of: model.selectedID) {
-                guard ChatScrollPolicy.target(for: .selectedConversationChanged) == .bottom else {
-                    return
-                }
                 lastTranscriptCount = 0
                 DispatchQueue.main.async {
+                    let target = ChatScrollPolicy.target(
+                        for: .selectedConversationChanged(hasUserMessages: hasUserMessages)
+                    )
                     lastTranscriptCount = model.transcript.count
-                    scrollToBottom(proxy, animated: false)
+                    if target == .top {
+                        scrollToTop(proxy, animated: false)
+                    } else if target == .bottom {
+                        scrollToBottom(proxy, animated: false)
+                    }
                 }
             }
             .onAppear {
@@ -146,8 +150,11 @@ struct ChatPaneView: View {
     }
 
     private var sizeChangeAnchor: UnitPoint? {
-        let hasUserMessages = model.transcript.contains { $0.speakerID == "user" }
         return ChatScrollPolicy.pinsSizeChangesToTop(hasUserMessages: hasUserMessages) ? .top : nil
+    }
+
+    private var hasUserMessages: Bool {
+        model.transcript.contains { $0.speakerID == "user" }
     }
 
     private var composerArea: some View {
