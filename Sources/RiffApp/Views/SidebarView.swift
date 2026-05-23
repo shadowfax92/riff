@@ -21,7 +21,7 @@ struct SidebarView: View {
         .navigationSplitViewColumnWidth(min: 240, ideal: Theme.Metric.sidebarWidth, max: 360)
         .onDeleteCommand {
             if let row = model.rows.first(where: { $0.id == model.selectedID }),
-               !(model.isRunning && row.id == model.selectedID) {
+               !model.isConversationRunning(row.id) {
                 pendingDelete = row
             }
         }
@@ -110,7 +110,11 @@ struct SidebarView: View {
         ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(filteredRows) { row in
-                    ConversationListRow(row: row, isSelected: row.id == model.selectedID)
+                    ConversationListRow(
+                        row: row,
+                        isSelected: row.id == model.selectedID,
+                        isRunning: model.isConversationRunning(row.id)
+                    )
                         .contentShape(Rectangle())
                         .onTapGesture {
                             Task { await model.select(row) }
@@ -121,7 +125,7 @@ struct SidebarView: View {
                             } label: {
                                 Label("Delete Conversation", systemImage: "trash")
                             }
-                            .disabled(model.isRunning && row.id == model.selectedID)
+                            .disabled(model.isConversationRunning(row.id))
                         }
                 }
             }
@@ -150,6 +154,7 @@ struct SidebarView: View {
 private struct ConversationListRow: View {
     let row: ConversationRow
     let isSelected: Bool
+    let isRunning: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -171,7 +176,7 @@ private struct ConversationListRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                if row.conversation.status == .running {
+                if isRunning {
                     HStack(spacing: 4) {
                         Circle()
                             .fill(Color.green)

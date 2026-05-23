@@ -52,7 +52,7 @@ public actor DebateOrchestrator {
         shouldStop = true
     }
 
-    /// Runs a fresh-session summary pass with the configured summary agent
+    /// Runs a fresh-session summary pass with the first configured agent
     /// after a debate has completed. The returned entry is intentionally not
     /// written to disk; callers decide whether to display it as UI-only state.
     public func summarize(summaryPrompt: String, summaryAgent: AgentProfile) async throws -> TranscriptEntry? {
@@ -75,7 +75,8 @@ public actor DebateOrchestrator {
                 baselinePrompt: summaryPrompt,
                 conversationPrompt: conversation.prompt,
                 context: composeFullContext(transcript),
-                attachmentPath: ""
+                attachmentPath: "",
+                supportFolders: conversation.supportFolders
             ),
             emit: onTurnEvent
         )
@@ -149,7 +150,8 @@ public actor DebateOrchestrator {
                         baselinePrompt: baselinePrompt,
                         conversationPrompt: conversation.prompt,
                         context: composeContext(transcript, for: agent, after: session.lastContextTurn),
-                        attachmentPath: attachmentPath
+                        attachmentPath: attachmentPath,
+                        supportFolders: conversation.supportFolders
                     ),
                     emit: { event in turnEvent(event) }
                 )

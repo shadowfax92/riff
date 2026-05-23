@@ -9,6 +9,7 @@ public struct RuntimeTurnRequest: Equatable, Sendable {
     public var purpose: RuntimeTurnPurpose
     public var agent: AgentProfile
     public var conversationRoot: URL
+    public var supportFolders: [URL]
     public var sessionID: String?
     public var baselinePrompt: String
     public var conversationPrompt: String
@@ -23,11 +24,13 @@ public struct RuntimeTurnRequest: Equatable, Sendable {
         baselinePrompt: String,
         conversationPrompt: String,
         context: String,
-        attachmentPath: String
+        attachmentPath: String,
+        supportFolders: [URL] = []
     ) {
         self.purpose = purpose
         self.agent = agent
         self.conversationRoot = conversationRoot
+        self.supportFolders = supportFolders
         self.sessionID = sessionID
         self.baselinePrompt = baselinePrompt
         self.conversationPrompt = conversationPrompt
@@ -81,6 +84,7 @@ public final class CLIRuntimeAdapter: RuntimeAdapter, @unchecked Sendable {
         var invocation = definition.buildInvocation(RuntimeInvocationRequest(
             sessionID: request.sessionID,
             cwd: request.conversationRoot,
+            allowedDirectories: request.supportFolders,
             options: RuntimeBuildOptions(model: request.agent.model, reasoning: request.agent.reasoning),
             stdin: stdin
         ))
@@ -135,6 +139,9 @@ public enum RuntimePromptBuilder {
             parts.append("Continue as \(request.agent.name) (\(request.agent.role)).")
             parts.append("Optional detail file for this turn: `\(request.attachmentPath)`.")
         }
+        if !request.supportFolders.isEmpty {
+            parts.append("Support folders:\n" + request.supportFolders.map(\.path).joined(separator: "\n"))
+        }
         parts.append("Debate prompt:\n\(request.conversationPrompt)")
         if request.context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("No prior messages yet.")
@@ -154,6 +161,9 @@ public enum RuntimePromptBuilder {
         let instructions = request.agent.instructions.trimmingCharacters(in: .whitespacesAndNewlines)
         if !instructions.isEmpty {
             parts.append("SUMMARY_AGENT_PROMPT:\n\(instructions)")
+        }
+        if !request.supportFolders.isEmpty {
+            parts.append("Support folders:\n" + request.supportFolders.map(\.path).joined(separator: "\n"))
         }
         parts.append("Debate prompt:\n\(request.conversationPrompt)")
         if request.context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

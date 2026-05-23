@@ -9,8 +9,8 @@ struct NewConversationSheet: View {
     @State private var title = ""
     @State private var prompt = ""
     @State private var maxRounds = 10
-    @State private var customFolder: URL?
-    @State private var choosingFolder = false
+    @State private var supportFolders: [URL] = []
+    @State private var choosingSupportFolder = false
     @State private var roleDrafts: [RoleDraft] = {
         let identity = RoleNameGenerator.generate()
         return [
@@ -81,7 +81,7 @@ struct NewConversationSheet: View {
                             title: trimmedTitle,
                             prompt: prompt,
                             maxRounds: maxRounds,
-                            customFolder: customFolder,
+                            supportFolders: supportFolders,
                             roleDrafts: roleDrafts
                         )
                         if created {
@@ -95,9 +95,9 @@ struct NewConversationSheet: View {
         }
         .padding(22)
         .frame(width: 640)
-        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.directory]) { result in
+        .fileImporter(isPresented: $choosingSupportFolder, allowedContentTypes: [.directory]) { result in
             if case .success(let url) = result {
-                customFolder = url
+                addSupportFolder(url)
             }
         }
     }
@@ -157,33 +157,41 @@ struct NewConversationSheet: View {
     }
 
     private var folderRow: some View {
-        HStack(spacing: 10) {
-            Button {
-                choosingFolder = true
-            } label: {
-                Label("Choose Folder", systemImage: "folder")
-                    .font(.system(size: 12))
-            }
-            .controlSize(.small)
-            if let customFolder {
-                Text(customFolder.path)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Button {
+                    choosingSupportFolder = true
+                } label: {
+                    Label("Add Folder", systemImage: "folder.badge.plus")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+                Text("Agents can read these folders; Riff stores the chat under ~/.riff/conversations/<id>.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.middle)
-                Button {
-                    self.customFolder = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Text("Default: ~/.riff/conversations/<id>")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .truncationMode(.tail)
+                Spacer()
             }
-            Spacer()
+            ForEach(supportFolders, id: \.self) { folder in
+                HStack(spacing: 8) {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                    Text(folder.path)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button {
+                        removeSupportFolder(folder)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 
@@ -300,6 +308,18 @@ struct NewConversationSheet: View {
     private func removeRole(_ id: String) {
         guard roleDrafts.count > 1 else { return }
         roleDrafts.removeAll { $0.id == id }
+    }
+
+    private func addSupportFolder(_ folder: URL) {
+        let standardized = folder.standardizedFileURL
+        guard !supportFolders.contains(standardized) else {
+            return
+        }
+        supportFolders.append(standardized)
+    }
+
+    private func removeSupportFolder(_ folder: URL) {
+        supportFolders.removeAll { $0 == folder }
     }
 }
 

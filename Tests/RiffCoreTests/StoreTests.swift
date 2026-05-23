@@ -106,6 +106,50 @@ import Testing
     #expect(FileManager.default.fileExists(atPath: store.agentCWD(agentID: "a1").path))
 }
 
+@Test func creatingConversationPersistsSupportFolders() throws {
+    let root = try temporaryDirectory().appending(path: "conversation", directoryHint: .isDirectory)
+    let store = ConversationStore(rootURL: root)
+    var conversation = sampleConversation()
+    conversation.supportFolders = [
+        URL(fileURLWithPath: "/Users/me/research"),
+        URL(fileURLWithPath: "/Users/me/notes"),
+    ]
+
+    try store.create(conversation)
+
+    #expect(try store.readConversation().supportFolders.map(\.path) == [
+        "/Users/me/research",
+        "/Users/me/notes",
+    ])
+}
+
+@Test func conversationDecodesLegacyJSONWithoutSupportFolders() throws {
+    let data = Data("""
+    {
+      "agents": [
+        {
+          "id": "a1",
+          "instructions": "go",
+          "model": "default",
+          "name": "A",
+          "role": "Advocate",
+          "runtime": "claude"
+        }
+      ],
+      "createdAt": "1970-01-01T00:00:00Z",
+      "id": "c1",
+      "maxRounds": 1,
+      "prompt": "Debate this",
+      "status": "idle",
+      "title": "Test"
+    }
+    """.utf8)
+
+    let conversation = try RiffJSON.decoder.decode(Conversation.self, from: data)
+
+    #expect(conversation.supportFolders.isEmpty)
+}
+
 @Test func transcriptAppendsPreserveOrderAcrossReads() throws {
     let store = ConversationStore(rootURL: try temporaryDirectory())
     try store.create(sampleConversation())

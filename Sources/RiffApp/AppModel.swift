@@ -29,13 +29,13 @@ final class AppModel: ObservableObject {
     @Published var basePrompt = ""
     @Published var summaryPrompt = ""
     @Published var summaryAgent = ConfigStore.defaultSummaryAgent
-    @Published var isRunning = false
-    @Published var activeTurn: ActiveTurnState?
+    @Published var runRegistry = ConversationRunRegistry()
     @Published var errorMessage: String?
     @Published var detectedRuntimes: [RuntimeID: DetectedRuntime] = [:]
     @Published var runtimeSettings = RuntimeSettings()
-    @Published var pendingSteer: PendingSteer?
-    @Published var isApplyingSteer = false
+    @Published var pendingSteers: [String: [String]] = [:]
+    @Published var applyingSteerIDs: Set<String> = []
+    @Published var summarizingIDs: Set<String> = []
 
     private let paths = RiffPaths()
     private lazy var configStore = ConfigStore(paths: paths)
@@ -75,9 +75,20 @@ final class AppModel: ObservableObject {
         }
     }
     private var selectedLocation: ConversationLocation?
-    private var runningOrchestrator: DebateOrchestrator?
-    private var runTask: Task<Void, Never>?
-    private var isSummarizing = false
+    private var runningOrchestrators: [String: DebateOrchestrator] = [:]
+    private var runTasks: [String: Task<Void, Never>] = [:]
+
+    var isRunning: Bool { !runRegistry.runningIDs.isEmpty }
+    var isSelectedConversationRunning: Bool { runRegistry.isRunning(conversationID: selectedID) }
+    var isSelectedConversationSummarizing: Bool { selectedID.map { summarizingIDs.contains($0) } ?? false }
+    var selectedActiveTurn: ActiveTurnState? { runRegistry.activeTurn(conversationID: selectedID) }
+    var isSelectedApplyingSteer: Bool { selectedID.map { applyingSteerIDs.contains($0) } ?? false }
+    var selectedPendingSteer: PendingSteer? {
+        guard let selectedID, let messages = pendingSteers[selectedID], !messages.isEmpty else {
+            return nil
+        }
+        return PendingSteer(conversationID: selectedID, messages: messages)
+    }
 
     /// Initializes local config files and loads recent/default conversations
     /// into the sidebar without overwriting user-edited configs.
@@ -101,9 +112,9 @@ final class AppModel: ObservableObject {
         await reloadSelected()
     }
 
-    /// Creates a file-backed conversation either in the default Riff root or
-    /// in a folder the user selected from the macOS file picker.
-    func createConversation(title: String, prompt: String, maxRounds: Int, customFolder: URL?, roleDrafts: [RoleDraft]) async -> Bool {
+    /// Creates a file-backed conversation under Riff's conversation root and
+    /// records user-selected support folders that agents may read during turns.
+    func createConversation(title: String, prompt: String, maxRounds: Int, supportFolders: [URL], roleDrafts: [RoleDraft]) async -> Bool {
         do {
             let agents = roleDrafts
                 .filter(\.isValid)
@@ -122,13 +133,14 @@ final class AppModel: ObservableObject {
                 return false
             }
             let id = RiffPathFormat.newConversationID()
-            let root = customFolder ?? paths.defaultConversationURL(id: id)
+            let root = paths.defaultConversationURL(id: id)
             let conversation = Conversation(
                 id: id,
                 title: title,
                 prompt: prompt,
                 maxRounds: maxRounds,
-                agents: agents
+                agents: agents,
+                supportFolders: supportFolders
             )
             let store = ConversationStore(rootURL: root)
             try store.create(conversation)
@@ -167,12 +179,12 @@ final class AppModel: ObservableObject {
             return
         }
         do {
-            if isRunning {
+            if runRegistry.isRunning(conversationID: location.id) {
                 queueSteerMessage(trimmed)
                 return
             }
             try appendUserMessages([trimmed], to: location)
-            startSelectedConversation()
+            startConversation(at: location)
         } catch {
             errorMessage = String(describing: error)
         }
@@ -181,37 +193,33 @@ final class AppModel: ObservableObject {
     /// Applies queued steer text by cancelling the active agent process,
     /// writing the human message, and restarting the debate loop from disk.
     func applyPendingSteer() {
-        guard let pendingSteer, pendingSteer.conversationID == selectedID, !pendingSteer.messages.isEmpty else {
+        guard let selectedID, let location = selectedLocation, let pendingSteer = selectedPendingSteer else {
             return
         }
         let messages = pendingSteer.messages
-        self.pendingSteer = nil
+        removePendingSteer(conversationID: selectedID)
 
-        if isRunning, let task = runTask {
-            isApplyingSteer = true
+        if runRegistry.isRunning(conversationID: selectedID), let task = runTasks[selectedID] {
+            setApplyingSteer(true, conversationID: selectedID)
             task.cancel()
             Task { @MainActor [weak self] in
                 await task.value
                 guard let self else {
                     return
                 }
-                guard let location = self.selectedLocation else {
-                    self.isApplyingSteer = false
-                    return
-                }
                 do {
                     try self.appendUserMessages(messages, to: location)
-                    self.isApplyingSteer = false
-                    self.startSelectedConversation()
+                    self.setApplyingSteer(false, conversationID: selectedID)
+                    self.startConversation(at: location)
                 } catch {
-                    self.isApplyingSteer = false
+                    self.setApplyingSteer(false, conversationID: selectedID)
                     self.errorMessage = String(describing: error)
                 }
             }
-        } else if let location = selectedLocation {
+        } else {
             do {
                 try appendUserMessages(messages, to: location)
-                startSelectedConversation()
+                startConversation(at: location)
             } catch {
                 errorMessage = String(describing: error)
             }
@@ -219,22 +227,30 @@ final class AppModel: ObservableObject {
     }
 
     func clearPendingSteer() {
-        guard pendingSteer?.conversationID == selectedID else {
+        guard let selectedID else {
             return
         }
-        pendingSteer = nil
+        removePendingSteer(conversationID: selectedID)
     }
 
     /// Starts real Claude/Codex turns for the selected conversation using
     /// the configured baseline prompt and local CLI adapters.
     func startSelectedConversation() {
-        guard let location = selectedLocation, !isRunning else {
+        guard let location = selectedLocation else {
             return
         }
-        isRunning = true
+        startConversation(at: location)
+    }
+
+    private func startConversation(at location: ConversationLocation) {
+        guard !runRegistry.isRunning(conversationID: location.id) else {
+            return
+        }
+        updateRunRegistry { $0.start(conversationID: location.id) }
         let store = ConversationStore(rootURL: location.url)
         let summaryPrompt = summaryPrompt
         let summaryAgent = summaryAgent
+        let conversationID = location.id
         let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
         let orchestrator = DebateOrchestrator(
             store: store,
@@ -253,29 +269,38 @@ final class AppModel: ObservableObject {
             baselinePrompt: basePrompt,
             onTurnStart: { [weak self] agent, turn in
                 Task { @MainActor [weak self] in
-                    self?.activeTurn = ActiveTurnState(agent: agent, turn: turn, startedAt: Date())
+                    self?.updateRunRegistry {
+                        $0.setActiveTurn(
+                            ActiveTurnState(agent: agent, turn: turn, startedAt: Date()),
+                            conversationID: conversationID
+                        )
+                    }
                 }
             },
             onTurnEvent: { [weak self] event in
                 guard case .toolUse(let label) = event else { return }
                 Task { @MainActor [weak self] in
-                    self?.activeTurn?.events.append(label)
+                    self?.updateRunRegistry {
+                        $0.appendEvent(label, conversationID: conversationID)
+                    }
                 }
             },
             onTurnEnd: { [weak self] in
                 Task { @MainActor [weak self] in
-                    self?.activeTurn = nil
+                    self?.updateRunRegistry {
+                        $0.clearActiveTurn(conversationID: conversationID)
+                    }
                 }
             },
             onTranscriptChange: { [weak self] in
                 await MainActor.run { [weak self] in
-                    self?.reloadSelectedFromDisk()
+                    self?.reloadConversationFromDiskIfSelected(location)
                     try? self?.reloadRows()
                 }
             }
         )
-        runningOrchestrator = orchestrator
-        runTask = Task {
+        runningOrchestrators[conversationID] = orchestrator
+        runTasks[conversationID] = Task {
             var completedNaturally = false
             var summaryEntry: TranscriptEntry?
             do {
@@ -298,11 +323,13 @@ final class AppModel: ObservableObject {
                 }
             }
             await MainActor.run {
-                self.isRunning = false
-                self.runningOrchestrator = nil
-                self.activeTurn = nil
+                self.updateRunRegistry { $0.finish(conversationID: conversationID) }
+                self.runningOrchestrators[conversationID] = nil
+                self.runTasks[conversationID] = nil
             }
-            await self.reloadSelected()
+            await MainActor.run {
+                self.reloadConversationFromDiskIfSelected(location)
+            }
             if let summaryEntry, self.selectedID == location.id {
                 self.transcript.append(summaryEntry)
             }
@@ -313,7 +340,7 @@ final class AppModel: ObservableObject {
     /// Runs the configured summary agent in a fresh CLI session for the
     /// selected conversation and appends the result as UI-only transcript state.
     func summarizeSelectedConversation() {
-        guard let location = selectedLocation, !isSummarizing else {
+        guard let location = selectedLocation, !summarizingIDs.contains(location.id) else {
             return
         }
         guard !transcript.isEmpty else {
@@ -330,10 +357,11 @@ final class AppModel: ObservableObject {
             return
         }
 
-        isSummarizing = true
+        setSummarizing(true, conversationID: location.id)
         let store = ConversationStore(rootURL: location.url)
         let summaryPrompt = summaryPrompt
         let summaryAgent = summaryAgent
+        let conversationID = location.id
         let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
         let orchestrator = DebateOrchestrator(
             store: store,
@@ -365,28 +393,27 @@ final class AppModel: ObservableObject {
             guard let self else {
                 return
             }
-            self.isSummarizing = false
-            await self.reloadSelected()
-            if let summaryEntry, self.selectedID == location.id {
+            self.setSummarizing(false, conversationID: conversationID)
+            self.reloadConversationFromDiskIfSelected(location)
+            if let summaryEntry, self.selectedID == conversationID {
                 self.transcript.append(summaryEntry)
             }
             try? self.reloadRows()
         }
     }
 
-    var isSelectedConversationSummarizing: Bool {
-        isSummarizing
-    }
-
     func stopSelectedConversation() async {
-        await runningOrchestrator?.stop()
+        guard let selectedID else {
+            return
+        }
+        await runningOrchestrators[selectedID]?.stop()
     }
 
     /// Deletes a conversation from disk and the sidebar. The selected running
     /// conversation is protected because a live CLI may still be writing into
     /// its folder.
     func deleteConversation(_ row: ConversationRow) async {
-        guard !(isRunning && selectedID == row.id) else {
+        guard !runRegistry.isRunning(conversationID: row.id) else {
             errorMessage = "Stop the running conversation before deleting it."
             return
         }
@@ -454,6 +481,10 @@ final class AppModel: ObservableObject {
         detectedRuntimes = await detectRuntimes()
     }
 
+    func isConversationRunning(_ conversationID: String) -> Bool {
+        runRegistry.isRunning(conversationID: conversationID)
+    }
+
     func reloadSelected() async {
         reloadSelectedFromDisk()
     }
@@ -462,6 +493,17 @@ final class AppModel: ObservableObject {
         guard let location = selectedLocation else {
             return
         }
+        reloadConversationFromDisk(location)
+    }
+
+    private func reloadConversationFromDiskIfSelected(_ location: ConversationLocation) {
+        guard selectedID == location.id else {
+            return
+        }
+        reloadConversationFromDisk(location)
+    }
+
+    private func reloadConversationFromDisk(_ location: ConversationLocation) {
         do {
             let store = ConversationStore(rootURL: location.url)
             selectedConversation = try store.readConversation()
@@ -492,6 +534,9 @@ final class AppModel: ObservableObject {
     }
 
     private func clearSelection() {
+        if let selectedID {
+            removePendingSteer(conversationID: selectedID)
+        }
         selectedID = nil
         selectedLocation = nil
         selectedConversation = nil
@@ -499,19 +544,15 @@ final class AppModel: ObservableObject {
         files = []
         selectedFile = nil
         selectedMarkdown = ""
-        activeTurn = nil
-        pendingSteer = nil
     }
 
     private func queueSteerMessage(_ text: String) {
         guard let selectedID else {
             return
         }
-        if pendingSteer?.conversationID == selectedID {
-            pendingSteer?.messages.append(text)
-        } else {
-            pendingSteer = PendingSteer(conversationID: selectedID, messages: [text])
-        }
+        var steers = pendingSteers
+        steers[selectedID, default: []].append(text)
+        pendingSteers = steers
     }
 
     private func appendUserMessages(_ messages: [String], to location: ConversationLocation) throws {
@@ -531,8 +572,40 @@ final class AppModel: ObservableObject {
             ))
             nextTurn += 1
         }
-        reloadSelectedFromDisk()
+        reloadConversationFromDiskIfSelected(location)
         try reloadRows()
+    }
+
+    private func updateRunRegistry(_ update: (inout ConversationRunRegistry) -> Void) {
+        var registry = runRegistry
+        update(&registry)
+        runRegistry = registry
+    }
+
+    private func setApplyingSteer(_ applying: Bool, conversationID: String) {
+        var ids = applyingSteerIDs
+        if applying {
+            ids.insert(conversationID)
+        } else {
+            ids.remove(conversationID)
+        }
+        applyingSteerIDs = ids
+    }
+
+    private func setSummarizing(_ summarizing: Bool, conversationID: String) {
+        var ids = summarizingIDs
+        if summarizing {
+            ids.insert(conversationID)
+        } else {
+            ids.remove(conversationID)
+        }
+        summarizingIDs = ids
+    }
+
+    private func removePendingSteer(conversationID: String) {
+        var steers = pendingSteers
+        steers[conversationID] = nil
+        pendingSteers = steers
     }
 
     private func didComplete(transcript: [TranscriptEntry], conversation: Conversation) -> Bool {

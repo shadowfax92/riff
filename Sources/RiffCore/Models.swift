@@ -121,6 +121,7 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
     public var status: ConversationStatus
     public var maxRounds: Int
     public var agents: [AgentProfile]
+    public var supportFolders: [URL]
 
     public init(
         id: String,
@@ -129,7 +130,8 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
         createdAt: Date = Date(),
         status: ConversationStatus = .idle,
         maxRounds: Int = 1,
-        agents: [AgentProfile]
+        agents: [AgentProfile],
+        supportFolders: [URL] = []
     ) {
         self.id = id
         self.title = title
@@ -138,6 +140,42 @@ public struct Conversation: Codable, Equatable, Identifiable, Sendable {
         self.status = status
         self.maxRounds = max(1, maxRounds)
         self.agents = agents
+        self.supportFolders = supportFolders
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case prompt
+        case createdAt
+        case status
+        case maxRounds
+        case agents
+        case supportFolders
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        prompt = try container.decode(String.self, forKey: .prompt)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        status = try container.decode(ConversationStatus.self, forKey: .status)
+        maxRounds = max(1, try container.decode(Int.self, forKey: .maxRounds))
+        agents = try container.decode([AgentProfile].self, forKey: .agents)
+        supportFolders = try container.decodeIfPresent([URL].self, forKey: .supportFolders) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(prompt, forKey: .prompt)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(status, forKey: .status)
+        try container.encode(maxRounds, forKey: .maxRounds)
+        try container.encode(agents, forKey: .agents)
+        try container.encode(supportFolders, forKey: .supportFolders)
     }
 }
 

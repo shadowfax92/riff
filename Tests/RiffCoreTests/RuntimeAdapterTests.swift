@@ -147,6 +147,32 @@ import Testing
     #expect(await client.commands() == ["openclaude"])
 }
 
+@Test func cliAdapterPassesSupportFoldersAsAllowedDirectories() async throws {
+    let client = FakeProcessClient(results: [
+        "openclaude -p --input-format text --output-format stream-json --verbose --permission-mode bypassPermissions --add-dir /tmp/riff /Users/me/research": ProcessResult(stdout: """
+        {"type":"system","subtype":"init","session_id":"sid","model":"sonnet"}
+        {"type":"result","result":"hello","session_id":"sid","model":"sonnet"}
+        """)
+    ])
+    let adapter = CLIRuntimeAdapter(
+        definition: RuntimeDefinitions.claude,
+        command: "openclaude",
+        processClient: client
+    )
+
+    _ = try await adapter.runTurn(RuntimeTurnRequest(
+        agent: AgentProfile(id: "a", name: "A", role: "Role", runtime: .claude, model: "default", instructions: ""),
+        conversationRoot: URL(fileURLWithPath: "/tmp/riff"),
+        baselinePrompt: "base",
+        conversationPrompt: "prompt",
+        context: "",
+        attachmentPath: "files/turn-001.role.claude.md",
+        supportFolders: [URL(fileURLWithPath: "/Users/me/research")]
+    ))
+
+    #expect(await client.commands() == ["openclaude"])
+}
+
 @Test func freshRuntimePromptUsesRoleNameAndRolePromptLabels() {
     let prompt = RuntimePromptBuilder.prompt(
         for: RuntimeTurnRequest(
@@ -169,6 +195,30 @@ import Testing
     #expect(prompt.contains("base prompt"))
     #expect(prompt.contains("ROLE_NAME:\nSecurity"))
     #expect(prompt.contains("ROLE_PROMPT:\nPressure-test trust boundaries."))
+}
+
+@Test func freshRuntimePromptListsSupportFolderPaths() {
+    let prompt = RuntimePromptBuilder.prompt(
+        for: RuntimeTurnRequest(
+            agent: AgentProfile(
+                id: "security",
+                name: "Security",
+                role: "Security",
+                runtime: .codex,
+                instructions: "Pressure-test trust boundaries."
+            ),
+            conversationRoot: URL(fileURLWithPath: "/tmp/riff"),
+            baselinePrompt: "base prompt",
+            conversationPrompt: "debate this",
+            context: "",
+            attachmentPath: "files/turn-001.security.codex.md",
+            supportFolders: [URL(fileURLWithPath: "/Users/me/research")]
+        ),
+        includeInstructions: true
+    )
+
+    #expect(prompt.contains("Support folders:"))
+    #expect(prompt.contains("/Users/me/research"))
 }
 
 @Test func SummaryRuntimePromptUsesSummaryPromptAndFullContext() {

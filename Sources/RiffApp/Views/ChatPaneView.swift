@@ -51,7 +51,7 @@ struct ChatPaneView: View {
     @ViewBuilder
     private var actionButton: some View {
         HStack(spacing: 8) {
-            if model.isRunning {
+            if model.isSelectedConversationRunning {
                 Button {
                     Task { await model.stopSelectedConversation() }
                 } label: {
@@ -98,7 +98,7 @@ struct ChatPaneView: View {
                                 .id(entry.id)
                         }
                     }
-                    if let active = model.activeTurn {
+                    if let active = model.selectedActiveTurn {
                         ThinkingIndicator(state: active)
                             .padding(.top, 6)
                             .id("__thinking__")
@@ -153,7 +153,7 @@ struct ChatPaneView: View {
                         .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.borderless)
-                .disabled(model.isApplyingSteer)
+                .disabled(model.isSelectedApplyingSteer)
                 Button {
                     model.clearPendingSteer()
                 } label: {
@@ -162,7 +162,7 @@ struct ChatPaneView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .disabled(model.isApplyingSteer)
+                .disabled(model.isSelectedApplyingSteer)
                 .help("Clear queued steer messages")
             }
             .padding(.horizontal, 12)
@@ -210,10 +210,7 @@ struct ChatPaneView: View {
     }
 
     private var selectedPendingSteer: PendingSteer? {
-        guard let pending = model.pendingSteer, pending.conversationID == model.selectedID else {
-            return nil
-        }
-        return pending
+        model.selectedPendingSteer
     }
 
     private var sendDisabled: Bool {

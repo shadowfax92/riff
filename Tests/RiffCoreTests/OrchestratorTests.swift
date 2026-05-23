@@ -122,6 +122,27 @@ import Testing
     #expect(requests.first?.context == "You: fresh guidance")
 }
 
+@Test func runtimeRequestsIncludeConversationSupportFolders() async throws {
+    let supportFolders = [
+        URL(fileURLWithPath: "/Users/me/research"),
+        URL(fileURLWithPath: "/Users/me/notes"),
+    ]
+    let store = try makeStore(agents: [agent("a1", .claude)], supportFolders: supportFolders)
+    let adapter = RecordingAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    _ = try await orchestrator.run()
+
+    let request = try #require(await adapter.requests.first)
+    #expect(request.supportFolders == supportFolders)
+    #expect(request.conversationRoot == store.rootURL)
+}
+
 @Test func createdAndMentionedMarkdownFilesAreLinkedFromTurn() async throws {
     let store = try makeStore(agents: [agent("a1", .claude)])
     let adapter = FileWritingAdapter()
@@ -314,14 +335,19 @@ private actor BlockingAdapter: RuntimeAdapter {
     }
 }
 
-private func makeStore(agents: [AgentProfile], maxRounds: Int = 1) throws -> ConversationStore {
+private func makeStore(
+    agents: [AgentProfile],
+    maxRounds: Int = 1,
+    supportFolders: [URL] = []
+) throws -> ConversationStore {
     let store = ConversationStore(rootURL: try temporaryDirectory())
     try store.create(Conversation(
         id: "c1",
         title: "Debate",
         prompt: "Should we build this?",
         maxRounds: maxRounds,
-        agents: agents
+        agents: agents,
+        supportFolders: supportFolders
     ))
     return store
 }
