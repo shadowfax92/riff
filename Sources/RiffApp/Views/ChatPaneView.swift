@@ -334,6 +334,7 @@ private struct DateDivider: View {
 
 private struct MessageRow: View {
     @EnvironmentObject private var model: AppModel
+    @AppStorage("riff.showFilesPane") private var showFilesPane = true
     let entry: TranscriptEntry
     let showHeader: Bool
 
@@ -391,8 +392,9 @@ private struct MessageRow: View {
                     .padding(.horizontal, 12)
             }
             ForEach(entry.attachments) { attachment in
-                AttachmentCard(attachment: attachment)
-                    .onTapGesture { Task { await openAttachment(attachment) } }
+                AttachmentCard(attachment: attachment) {
+                    Task { await openAttachment(attachment) }
+                }
             }
         }
         .frame(maxWidth: isUser ? nil : .infinity, alignment: isUser ? .trailing : .leading)
@@ -442,8 +444,10 @@ private struct MessageRow: View {
     /// Tapping an inline attachment selects that file in the artifacts pane
     /// instead of opening it via NSWorkspace — keeps the user in the app.
     private func openAttachment(_ attachment: TranscriptAttachment) async {
-        let filename = (attachment.path as NSString).lastPathComponent
-        if let match = model.files.first(where: { $0.relativePath == attachment.path || $0.name == filename }) {
+        if let match = AttachmentFileMatcher.match(attachment: attachment, files: model.files) {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                showFilesPane = true
+            }
             await model.selectFile(match)
         }
     }
@@ -451,31 +455,36 @@ private struct MessageRow: View {
 
 private struct AttachmentCard: View {
     let attachment: TranscriptAttachment
+    let open: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "doc.text.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(Theme.Color.surfaceOverlay)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(filename)
-                    .font(.system(size: 12, weight: .medium))
-                Text("Document · MD")
-                    .font(.system(size: 10))
+        Button(action: open) {
+            HStack(spacing: 10) {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 16))
                     .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Theme.Color.surfaceOverlay)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(filename)
+                        .font(.system(size: 12, weight: .medium))
+                    Text("Document · MD")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 6)
+                Text("Open")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.Color.surfaceOverlay)
+                    .clipShape(Capsule())
             }
-            Spacer(minLength: 6)
-            Text("Open")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Theme.Color.surfaceOverlay)
-                .clipShape(Capsule())
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Theme.Color.cardBackground)

@@ -17,6 +17,7 @@ struct FilePaneView: View {
         }
         .background(Theme.Color.filesBackground)
         .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Metric.filesWidth, max: 920)
+        .animation(.easeInOut(duration: 0.18), value: model.selectedFile?.id)
     }
 
     private var header: some View {
@@ -158,6 +159,7 @@ private struct FileCardRow: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Theme.Color.cardStroke, lineWidth: 1)
         )
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
     private var subtitle: String {
