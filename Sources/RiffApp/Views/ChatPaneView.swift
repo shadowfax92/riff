@@ -5,6 +5,7 @@ import SwiftUI
 struct ChatPaneView: View {
     @EnvironmentObject private var model: AppModel
     @State private var draft = ""
+    @State private var lastTranscriptCount = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -109,12 +110,31 @@ struct ChatPaneView: View {
                 .padding(.vertical, 16)
             }
             .onChange(of: model.transcript.count) {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    proxy.scrollTo("__bottom__", anchor: .bottom)
+                let newCount = model.transcript.count
+                let target = ChatScrollPolicy.target(
+                    for: .transcriptAppended(
+                        previousCount: lastTranscriptCount,
+                        currentCount: newCount,
+                        latestSpeakerID: model.transcript.last?.speakerID
+                    )
+                )
+                lastTranscriptCount = newCount
+                if target == .bottom {
+                    scrollToBottom(proxy, animated: true)
                 }
             }
             .onChange(of: model.selectedID) {
-                proxy.scrollTo("__bottom__", anchor: .bottom)
+                guard ChatScrollPolicy.target(for: .selectedConversationChanged) == .bottom else {
+                    return
+                }
+                lastTranscriptCount = 0
+                DispatchQueue.main.async {
+                    lastTranscriptCount = model.transcript.count
+                    scrollToBottom(proxy, animated: false)
+                }
+            }
+            .onAppear {
+                lastTranscriptCount = model.transcript.count
             }
         }
     }
@@ -223,6 +243,16 @@ struct ChatPaneView: View {
         let text = draft
         draft = ""
         model.sendUserMessage(text)
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
+        if animated {
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo("__bottom__", anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo("__bottom__", anchor: .bottom)
+        }
     }
 }
 
