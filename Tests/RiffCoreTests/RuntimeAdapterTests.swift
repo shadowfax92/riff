@@ -22,6 +22,36 @@ import Testing
     #expect(invocation.stdin == "prompt")
 }
 
+@Test func claudeFreshTurnsPassModelAndEffortOptions() {
+    let request = RuntimeInvocationRequest(
+        cwd: URL(fileURLWithPath: "/tmp/riff"),
+        options: RuntimeBuildOptions(model: "opus", reasoning: "xhigh"),
+        stdin: "prompt"
+    )
+
+    let invocation = RuntimeDefinitions.claude.buildInvocation(request)
+
+    #expect(hasPair(invocation.arguments, "--model", "opus"))
+    #expect(hasPair(invocation.arguments, "--effort", "xhigh"))
+}
+
+@Test func runtimeReasoningOptionsMatchRuntimeFlags() {
+    #expect(RuntimeDefinitions.reasoningOptions(for: .claude).map(\.id) == [
+        "default",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+    ])
+    #expect(RuntimeDefinitions.reasoningOptions(for: .codex).map(\.id) == [
+        "default",
+        "low",
+        "medium",
+        "high",
+    ])
+}
+
 @Test func claudeResumeIncludesSessionAndKeepsPromptOnStdin() {
     let request = RuntimeInvocationRequest(
         sessionID: "claude-session",

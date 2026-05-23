@@ -10,6 +10,16 @@ public struct RuntimeModelOption: Equatable, Codable, Sendable {
     }
 }
 
+public struct RuntimeReasoningOption: Equatable, Codable, Sendable {
+    public var id: String
+    public var label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
+    }
+}
+
 public struct RuntimeBuildOptions: Equatable, Sendable {
     public var model: String
     public var reasoning: String?
@@ -73,6 +83,7 @@ public struct RuntimeDefinition: Sendable {
 
 public enum RuntimeDefinitions {
     public static let defaultModel = RuntimeModelOption(id: "default", label: "Default (CLI config)")
+    public static let defaultReasoning = RuntimeReasoningOption(id: "default", label: "Default (CLI config)")
 
     public static let claude = RuntimeDefinition(harness: ClaudeRuntimeHarness())
 
@@ -84,6 +95,27 @@ public enum RuntimeDefinitions {
             claude
         case .codex:
             codex
+        }
+    }
+
+    public static func reasoningOptions(for id: RuntimeID) -> [RuntimeReasoningOption] {
+        switch id {
+        case .claude:
+            [
+                defaultReasoning,
+                RuntimeReasoningOption(id: "low", label: "Low"),
+                RuntimeReasoningOption(id: "medium", label: "Medium"),
+                RuntimeReasoningOption(id: "high", label: "High"),
+                RuntimeReasoningOption(id: "xhigh", label: "XHigh"),
+                RuntimeReasoningOption(id: "max", label: "Max"),
+            ]
+        case .codex:
+            [
+                defaultReasoning,
+                RuntimeReasoningOption(id: "low", label: "Low"),
+                RuntimeReasoningOption(id: "medium", label: "Medium"),
+                RuntimeReasoningOption(id: "high", label: "High"),
+            ]
         }
     }
 

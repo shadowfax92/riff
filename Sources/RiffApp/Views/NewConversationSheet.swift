@@ -314,8 +314,6 @@ private struct RoleEditor: View {
     let canDelete: Bool
     let onDelete: () -> Void
 
-    private static let codexReasoningOptions = ["default", "low", "medium", "high"]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -346,7 +344,10 @@ private struct RoleEditor: View {
                 .labelsHidden()
                 .onChange(of: role.runtime) { _, newRuntime in
                     role.model = "default"
-                    role.reasoning = newRuntime == .codex ? "medium" : nil
+                    if let reasoning = role.reasoning,
+                       !reasoningOptions(for: newRuntime).contains(where: { $0.id == reasoning }) {
+                        role.reasoning = nil
+                    }
                 }
                 if canDelete {
                     Button {
@@ -369,16 +370,14 @@ private struct RoleEditor: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                 }
-                if role.runtime == .codex {
-                    fieldWithLabel("Reasoning") {
-                        Picker("", selection: reasoningBinding) {
-                            ForEach(Self.codexReasoningOptions, id: \.self) { option in
-                                Text(option.capitalized).tag(option)
-                            }
+                fieldWithLabel("Reasoning") {
+                    Picker("", selection: reasoningBinding) {
+                        ForEach(reasoningOptions, id: \.id) { option in
+                            Text(option.label).tag(option.id)
                         }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
             }
 
@@ -450,9 +449,18 @@ private struct RoleEditor: View {
     private var reasoningBinding: Binding<String> {
         Binding {
             let current = role.reasoning?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return current.isEmpty ? "default" : current
+            if current.isEmpty { return "default" }
+            return reasoningOptions.contains(where: { $0.id == current }) ? current : "default"
         } set: { value in
             role.reasoning = value == "default" ? nil : value
         }
+    }
+
+    private var reasoningOptions: [RuntimeReasoningOption] {
+        reasoningOptions(for: role.runtime)
+    }
+
+    private func reasoningOptions(for runtime: RuntimeID) -> [RuntimeReasoningOption] {
+        RuntimeDefinitions.reasoningOptions(for: runtime)
     }
 }

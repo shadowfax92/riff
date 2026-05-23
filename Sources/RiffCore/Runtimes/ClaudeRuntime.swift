@@ -32,6 +32,9 @@ public struct ClaudeRuntimeHarness: RuntimeHarness {
         if request.options.model != "default", !request.options.model.isEmpty {
             args += ["--model", request.options.model]
         }
+        if let reasoning = request.options.reasoning, reasoning != "default", !reasoning.isEmpty {
+            args += ["--effort", reasoning]
+        }
         let allowed = ([request.cwd] + request.allowedDirectories)
             .map(\.path)
             .filter { !$0.isEmpty }

@@ -13,8 +13,6 @@ struct SettingsSheet: View {
     @State private var codexPath = ""
     @State private var isSaving = false
 
-    private static let codexReasoningOptions = ["default", "low", "medium", "high"]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Settings")
@@ -183,16 +181,14 @@ struct SettingsSheet: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                 }
-                if summaryAgent.runtime == .codex {
-                    settingPicker("Reasoning") {
-                        Picker("", selection: summaryReasoningBinding) {
-                            ForEach(Self.codexReasoningOptions, id: \.self) { option in
-                                Text(option.capitalized).tag(option)
-                            }
+                settingPicker("Reasoning") {
+                    Picker("", selection: summaryReasoningBinding) {
+                        ForEach(summaryReasoningOptions, id: \.id) { option in
+                            Text(option.label).tag(option.id)
                         }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
             }
 
@@ -420,7 +416,10 @@ struct SettingsSheet: View {
         } set: { runtime in
             summaryAgent.runtime = runtime
             summaryAgent.model = "default"
-            summaryAgent.reasoning = runtime == .codex ? "medium" : nil
+            if let reasoning = summaryAgent.reasoning,
+               !RuntimeDefinitions.reasoningOptions(for: runtime).contains(where: { $0.id == reasoning }) {
+                summaryAgent.reasoning = nil
+            }
         }
     }
 
@@ -444,10 +443,15 @@ struct SettingsSheet: View {
     private var summaryReasoningBinding: Binding<String> {
         Binding {
             let current = summaryAgent.reasoning?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return current.isEmpty ? "default" : current
+            if current.isEmpty { return "default" }
+            return summaryReasoningOptions.contains(where: { $0.id == current }) ? current : "default"
         } set: { value in
             summaryAgent.reasoning = value == "default" ? nil : value
         }
+    }
+
+    private var summaryReasoningOptions: [RuntimeReasoningOption] {
+        RuntimeDefinitions.reasoningOptions(for: summaryAgent.runtime)
     }
 
     private var normalizedSummaryAgent: AgentProfile {
