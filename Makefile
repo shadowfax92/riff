@@ -5,7 +5,7 @@ BUNDLE_VERSION := 1
 CONFIG ?= release
 ICON_FILE := AppIcon.icns
 ICON_NAME := AppIcon
-INSTALL_DIR ?= $(HOME)/Applications
+INSTALL_DIR ?= /Applications
 MIN_MACOS := 15.0
 SHORT_VERSION := 0.1.0
 BIN_PATH := .build/$(CONFIG)/$(APP_NAME)
@@ -13,8 +13,11 @@ SHELL := /bin/bash
 
 DMG_PATH := $(APP_NAME)-$(SHORT_VERSION).dmg
 DMG_STAGING := .build/dmg-staging
+INSTALL_APP := $(INSTALL_DIR)/$(APP_BUNDLE)
+INSTALL_STAGING_DIR := .build/install-staging
+INSTALL_STAGING_APP := $(INSTALL_STAGING_DIR)/$(APP_BUNDLE)
 
-.PHONY: all build app icon install open dmg test clean
+.PHONY: all build app icon install reinstall uninstall open dmg test clean
 
 all: build
 
@@ -77,11 +80,26 @@ app: Resources/$(ICON_FILE)
 	echo "  open $(CURDIR)/$(APP_BUNDLE)"
 
 install: app
-	mkdir -p "$(INSTALL_DIR)"
-	rm -rf "$(INSTALL_DIR)/$(APP_BUNDLE)"
-	ditto "$(APP_BUNDLE)" "$(INSTALL_DIR)/$(APP_BUNDLE)"
-	@echo "✓ Installed $(INSTALL_DIR)/$(APP_BUNDLE)"
-	@echo "  open \"$(INSTALL_DIR)/$(APP_BUNDLE)\""
+	@set -euo pipefail; \
+	echo "→ installing $(INSTALL_APP)"; \
+	rm -rf "$(INSTALL_STAGING_DIR)"; \
+	mkdir -p "$(INSTALL_STAGING_DIR)" "$(INSTALL_DIR)"; \
+	ditto "$(APP_BUNDLE)" "$(INSTALL_STAGING_APP)"; \
+	codesign --force --sign - "$(INSTALL_STAGING_APP)" >/dev/null; \
+	rm -rf "$(INSTALL_APP)"; \
+	ditto "$(INSTALL_STAGING_APP)" "$(INSTALL_APP)"; \
+	codesign --verify --deep --strict "$(INSTALL_APP)" >/dev/null; \
+	rm -rf "$(INSTALL_STAGING_DIR)"; \
+	echo "✓ Installed $(INSTALL_APP)"; \
+	echo "  open \"$(INSTALL_APP)\""
+
+reinstall:
+	@rm -rf "$(INSTALL_APP)"
+	@$(MAKE) install INSTALL_DIR="$(INSTALL_DIR)" CONFIG="$(CONFIG)"
+
+uninstall:
+	rm -rf "$(INSTALL_APP)"
+	@echo "✓ Removed $(INSTALL_APP)"
 
 open: app
 	open "$(APP_BUNDLE)"
