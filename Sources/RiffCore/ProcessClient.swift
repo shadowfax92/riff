@@ -44,13 +44,19 @@ public enum ProcessClientError: Error, Equatable {
 
 public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
     private let environment: [String: String]?
+    private let logger: ProcessLogger?
 
-    public init(environment: [String: String]? = nil) {
+    public init(environment: [String: String]? = nil, logger: ProcessLogger? = nil) {
         self.environment = environment
+        self.logger = logger
     }
 
     public func run(_ invocation: ProcessInvocation) async throws -> ProcessResult {
         let state = ProcessRunState()
+        let logID = UUID().uuidString
+        let startedAt = Date()
+        let logger = self.logger
+        logger?.processStarted(id: logID, invocation: invocation, at: startedAt)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 guard state.begin(continuation) else {
@@ -81,10 +87,14 @@ public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
                         let output = String(data: outputData, encoding: .utf8),
                         let error = String(data: errorData, encoding: .utf8)
                     else {
-                        state.finish(.failure(ProcessClientError.failedToDecodeOutput))
+                        let error = ProcessClientError.failedToDecodeOutput
+                        logger?.processFailed(id: logID, error: error, startedAt: startedAt, finishedAt: Date())
+                        state.finish(.failure(error))
                         return
                     }
-                    state.finish(.success(ProcessResult(stdout: output, stderr: error, exitCode: process.terminationStatus)))
+                    let result = ProcessResult(stdout: output, stderr: error, exitCode: process.terminationStatus)
+                    logger?.processFinished(id: logID, result: result, startedAt: startedAt, finishedAt: Date())
+                    state.finish(.success(result))
                 }
 
                 guard state.setProcess(process) else {
@@ -107,6 +117,7 @@ public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
                     }
                     try stdin.fileHandleForWriting.close()
                 } catch {
+                    logger?.processFailed(id: logID, error: error, startedAt: startedAt, finishedAt: Date())
                     state.finish(.failure(error))
                 }
             }

@@ -11,10 +11,19 @@ public struct CodexRuntimeHarness: RuntimeHarness {
             RuntimeDefinitions.defaultModel,
             RuntimeModelOption(id: "gpt-5.5", label: "gpt-5.5"),
             RuntimeModelOption(id: "gpt-5.4", label: "gpt-5.4"),
+            RuntimeModelOption(id: "gpt-5.4-mini", label: "gpt-5.4-mini"),
             RuntimeModelOption(id: "gpt-5.3-codex", label: "gpt-5.3-codex"),
+            RuntimeModelOption(id: "gpt-5.3-codex-spark", label: "gpt-5.3-codex-spark"),
+            RuntimeModelOption(id: "gpt-5.1", label: "gpt-5.1"),
+            RuntimeModelOption(id: "gpt-5.1-codex-mini", label: "gpt-5.1-codex-mini"),
+            RuntimeModelOption(id: "gpt-5-codex", label: "gpt-5-codex"),
             RuntimeModelOption(id: "gpt-5", label: "gpt-5"),
+            RuntimeModelOption(id: "gpt-5-mini", label: "gpt-5-mini"),
+            RuntimeModelOption(id: "gpt-5-nano", label: "gpt-5-nano"),
             RuntimeModelOption(id: "o3", label: "o3"),
             RuntimeModelOption(id: "o4-mini", label: "o4-mini"),
+            RuntimeModelOption(id: "o3-mini", label: "o3-mini"),
+            RuntimeModelOption(id: "codex-mini-latest", label: "Codex Mini"),
         ]
     }
 

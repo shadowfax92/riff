@@ -112,9 +112,12 @@ public enum RuntimeDefinitions {
         case .codex:
             [
                 defaultReasoning,
+                RuntimeReasoningOption(id: "none", label: "None"),
+                RuntimeReasoningOption(id: "minimal", label: "Minimal"),
                 RuntimeReasoningOption(id: "low", label: "Low"),
                 RuntimeReasoningOption(id: "medium", label: "Medium"),
                 RuntimeReasoningOption(id: "high", label: "High"),
+                RuntimeReasoningOption(id: "xhigh", label: "XHigh"),
             ]
         }
     }
@@ -213,7 +216,8 @@ public func parseCodexDebugModels(_ stdout: String) -> [RuntimeModelOption]? {
     var seen = Set([RuntimeDefinitions.defaultModel.id])
     var output = [RuntimeDefinitions.defaultModel]
     for model in models {
-        if model["visibility"] as? String == "hidden" {
+        let visibility = model["visibility"] as? String
+        if visibility == "hidden" || visibility == "hide" {
             continue
         }
         let id = (model["slug"] as? String ?? model["id"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

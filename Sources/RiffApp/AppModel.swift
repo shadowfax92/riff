@@ -39,6 +39,7 @@ final class AppModel: ObservableObject {
 
     private let paths = RiffPaths()
     private lazy var configStore = ConfigStore(paths: paths)
+    private lazy var processLogger = FileProcessLogger(directoryURL: paths.logsURL)
 
     var basePromptURL: URL { configStore.basePromptURL }
     var summaryPromptURL: URL { configStore.summaryPromptURL }
@@ -252,7 +253,7 @@ final class AppModel: ObservableObject {
         let summaryPrompt = summaryPrompt
         let summaryAgent = summaryAgent
         let conversationID = location.id
-        let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
+        let processClient = makeProcessClient()
         let orchestrator = DebateOrchestrator(
             store: store,
             adapters: [
@@ -361,7 +362,7 @@ final class AppModel: ObservableObject {
         let summaryPrompt = summaryPrompt
         let summaryAgent = summaryAgent
         let conversationID = location.id
-        let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
+        let processClient = makeProcessClient()
         let orchestrator = DebateOrchestrator(
             store: store,
             adapters: [
@@ -642,11 +643,17 @@ final class AppModel: ObservableObject {
     }
 
     private func detectRuntimes() async -> [RuntimeID: DetectedRuntime] {
-        let detector = RuntimeDetector(processClient: FoundationProcessClient(environment: runtimeSettings.processEnvironment))
+        let detector = RuntimeDetector(processClient: makeProcessClient())
         let results = await [
             detector.detect(RuntimeDefinitions.claude, preferredCommand: runtimeSettings.command(for: .claude)),
             detector.detect(RuntimeDefinitions.codex, preferredCommand: runtimeSettings.command(for: .codex)),
         ]
         return Dictionary(uniqueKeysWithValues: results.map { ($0.id, $0) })
+    }
+
+    /// Creates CLI process clients with the configured subprocess PATH and
+    /// shared command logging so runtime probes and agent turns are debuggable.
+    private func makeProcessClient() -> FoundationProcessClient {
+        FoundationProcessClient(environment: runtimeSettings.processEnvironment, logger: processLogger)
     }
 }

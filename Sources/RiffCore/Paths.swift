@@ -25,6 +25,10 @@ public struct RiffPaths: Equatable, Sendable {
         rootURL.appending(path: "conversations", directoryHint: .isDirectory)
     }
 
+    public var logsURL: URL {
+        rootURL.appending(path: "logs", directoryHint: .isDirectory)
+    }
+
     public func defaultConversationURL(id: String) -> URL {
         conversationsURL.appending(path: id, directoryHint: .isDirectory)
     }

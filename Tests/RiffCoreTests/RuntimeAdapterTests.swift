@@ -46,9 +46,35 @@ import Testing
     ])
     #expect(RuntimeDefinitions.reasoningOptions(for: .codex).map(\.id) == [
         "default",
+        "none",
+        "minimal",
         "low",
         "medium",
         "high",
+        "xhigh",
+    ])
+}
+
+@Test func codexFallbackModelsMatchCurrentCliSurface() {
+    let ids = RuntimeDefinitions.codex.fallbackModels.map(\.id)
+
+    #expect(ids == [
+        "default",
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.3-codex",
+        "gpt-5.3-codex-spark",
+        "gpt-5.1",
+        "gpt-5.1-codex-mini",
+        "gpt-5-codex",
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "o3",
+        "o4-mini",
+        "o3-mini",
+        "codex-mini-latest",
     ])
 }
 
@@ -165,9 +191,9 @@ import Testing
     #expect(await client.commands() == ["/missing/claude"])
 }
 
-@Test func codexDebugModelsParserSkipsHiddenModels() {
+@Test func codexDebugModelsParserKeepsListVisibleModelsOnly() {
     let models = parseCodexDebugModels("""
-    {"models":[{"slug":"gpt-5.4","display_name":"GPT 5.4"},{"slug":"secret","visibility":"hidden"}]}
+    {"models":[{"slug":"gpt-5.4","display_name":"GPT 5.4","visibility":"list"},{"slug":"secret","visibility":"hide"},{"slug":"legacy","visibility":"hidden"}]}
     """)
 
     #expect(models?.map(\.id) == ["default", "gpt-5.4"])
