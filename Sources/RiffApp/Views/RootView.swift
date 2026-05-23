@@ -1,4 +1,3 @@
-import AppKit
 import RiffCore
 import SwiftUI
 
@@ -12,6 +11,12 @@ struct RootView: View {
     @AppStorage("riff.filePresentationMode") private var filePresentationModeRaw = FilePresentationMode.sidebar.rawValue
 
     var body: some View {
+        GeometryReader { geometry in
+            rootContent(containerSize: geometry.size)
+        }
+    }
+
+    private func rootContent(containerSize: CGSize) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(showingNewConversation: $showingNewConversation)
         } content: {
@@ -52,7 +57,7 @@ struct RootView: View {
                     onDock: dockPopupFile,
                     onClose: { model.selectedFile = nil }
                 )
-                .frame(width: popupSize.width, height: popupSize.height)
+                .frame(width: popupSize(for: containerSize).width, height: popupSize(for: containerSize).height)
                 .presentationSizing(.fitted)
                 .environmentObject(model)
             }
@@ -121,9 +126,8 @@ struct RootView: View {
         }
     }
 
-    private var popupSize: CGSize {
-        let frame = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1200, height: 800)
-        return CGSize(width: frame.width * 0.9, height: frame.height * 0.9)
+    private func popupSize(for containerSize: CGSize) -> CGSize {
+        FilePresentationMode.popupSize(for: containerSize)
     }
 
     private func cycleAppearance() {

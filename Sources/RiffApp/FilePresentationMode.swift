@@ -1,3 +1,5 @@
+import CoreGraphics
+
 enum FilePresentationMode: String, CaseIterable, Identifiable {
     case sidebar
     case popup
@@ -13,5 +15,9 @@ enum FilePresentationMode: String, CaseIterable, Identifiable {
 
     static func value(from rawValue: String) -> FilePresentationMode {
         FilePresentationMode(rawValue: rawValue) ?? .sidebar
+    }
+
+    static func popupSize(for containerSize: CGSize) -> CGSize {
+        CGSize(width: containerSize.width * 0.9, height: containerSize.height * 0.9)
     }
 }
