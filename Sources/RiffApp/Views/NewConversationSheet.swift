@@ -44,9 +44,12 @@ struct NewConversationSheet: View {
 
                     fieldGroup(label: "Prompt") {
                         styledField {
-                            TextField("What should the agents debate?", text: $prompt, axis: .vertical)
-                                .textFieldStyle(.plain)
-                                .lineLimit(3...8)
+                            MultilineTextField(
+                                placeholder: "What should the agents debate?",
+                                text: $prompt,
+                                minHeight: 72,
+                                maxHeight: 220
+                            )
                         }
                     }
 
@@ -401,17 +404,20 @@ private struct RoleEditor: View {
                 Text("Role prompt")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
-                TextField("Make a sharp case for…", text: $role.rolePrompt, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(2...6)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Theme.Color.surfaceOverlay)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Theme.Color.surfaceStroke)
-                    )
+                MultilineTextField(
+                    placeholder: "Make a sharp case for…",
+                    text: $role.rolePrompt,
+                    minHeight: 52,
+                    maxHeight: 140
+                )
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.surfaceStroke)
+                )
             }
         }
         .padding(12)
