@@ -1,15 +1,17 @@
-import MarkdownUI
 import RiffCore
 import SwiftUI
 
 struct FilePaneView: View {
     @EnvironmentObject private var model: AppModel
+    let presentationMode: FilePresentationMode
+    let openFile: (ConversationFile) -> Void
+    let popOut: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider().background(Theme.Color.separator)
-            if model.selectedFile == nil {
+            if presentationMode == .popup || model.selectedFile == nil {
                 fileListOrEmpty
             } else {
                 splitView
@@ -56,7 +58,7 @@ struct FilePaneView: View {
                     FileCardRow(file: file, isSelected: model.selectedFile?.id == file.id)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            Task { await model.selectFile(file) }
+                            openFile(file)
                         }
                 }
             }
@@ -72,34 +74,16 @@ struct FilePaneView: View {
         }
     }
 
+    @ViewBuilder
     private var markdownReader: some View {
-        VStack(spacing: 0) {
-            if let file = model.selectedFile {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.text.fill")
-                        .foregroundStyle(.secondary)
-                    Text(file.name)
-                        .font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    Button {
-                        model.selectedFile = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Close preview")
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                Divider().background(Theme.Color.separator)
-            }
-            ScrollView {
-                Markdown(model.selectedMarkdown)
-                    .markdownTheme(.gitHub)
-                    .padding(16)
-            }
+        if let file = model.selectedFile {
+            MarkdownFileReaderView(
+                file: file,
+                markdown: model.selectedMarkdown,
+                mode: .sidebar,
+                onDock: popOut,
+                onClose: { model.selectedFile = nil }
+            )
         }
     }
 

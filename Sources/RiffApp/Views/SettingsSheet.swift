@@ -12,6 +12,7 @@ struct SettingsSheet: View {
     @State private var claudePath = ""
     @State private var codexPath = ""
     @State private var isSaving = false
+    @AppStorage("riff.filePresentationMode") private var filePresentationModeRaw = FilePresentationMode.sidebar.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -23,6 +24,7 @@ struct SettingsSheet: View {
                     basePromptSection
                     summaryAgentSection
                     summaryPromptSection
+                    fileReadingSection
                     agentPathsSection
                     runtimesSection
                 }
@@ -297,6 +299,38 @@ struct SettingsSheet: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Theme.Color.surfaceStroke)
         )
+    }
+
+    private var fileReadingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("File Reading")
+                .font(.system(size: 13, weight: .semibold))
+            Picker("", selection: filePresentationModeBinding) {
+                ForEach(FilePresentationMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text("Choose where markdown attachments open by default.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
+    }
+
+    private var filePresentationModeBinding: Binding<FilePresentationMode> {
+        Binding {
+            FilePresentationMode.value(from: filePresentationModeRaw)
+        } set: { mode in
+            filePresentationModeRaw = mode.rawValue
+        }
     }
 
     private func pathField(label: String, placeholder: String, text: Binding<String>) -> some View {

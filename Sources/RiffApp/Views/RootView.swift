@@ -1,3 +1,5 @@
+import AppKit
+import RiffCore
 import SwiftUI
 
 struct RootView: View {
@@ -7,6 +9,7 @@ struct RootView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("riff.showFilesPane") private var showFilesPane = true
     @AppStorage("riff.appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
+    @AppStorage("riff.filePresentationMode") private var filePresentationModeRaw = FilePresentationMode.sidebar.rawValue
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -15,7 +18,11 @@ struct RootView: View {
             ChatPaneView()
         } detail: {
             if showFilesPane {
-                FilePaneView()
+                FilePaneView(
+                    presentationMode: filePresentationMode,
+                    openFile: openFile,
+                    popOut: popOutSelectedFile
+                )
             } else {
                 Color.clear
                     .navigationSplitViewColumnWidth(0)
@@ -35,6 +42,20 @@ struct RootView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsSheet()
                 .environmentObject(model)
+        }
+        .sheet(isPresented: popupFileBinding) {
+            if let file = model.selectedFile {
+                MarkdownFileReaderView(
+                    file: file,
+                    markdown: model.selectedMarkdown,
+                    mode: .popup,
+                    onDock: dockPopupFile,
+                    onClose: { model.selectedFile = nil }
+                )
+                .frame(width: popupSize.width, height: popupSize.height)
+                .presentationSizing(.fitted)
+                .environmentObject(model)
+            }
         }
         .alert("Riff Error", isPresented: Binding(
             get: { model.errorMessage != nil },
@@ -86,7 +107,49 @@ struct RootView: View {
         AppearanceMode(rawValue: appearanceRaw) ?? .system
     }
 
+    private var filePresentationMode: FilePresentationMode {
+        FilePresentationMode.value(from: filePresentationModeRaw)
+    }
+
+    private var popupFileBinding: Binding<Bool> {
+        Binding {
+            filePresentationMode == .popup && model.selectedFile != nil
+        } set: { isPresented in
+            if !isPresented, filePresentationMode == .popup {
+                model.selectedFile = nil
+            }
+        }
+    }
+
+    private var popupSize: CGSize {
+        let frame = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1200, height: 800)
+        return CGSize(width: frame.width * 0.9, height: frame.height * 0.9)
+    }
+
     private func cycleAppearance() {
         appearanceRaw = appearance.next.rawValue
+    }
+
+    private func openFile(_ file: ConversationFile) {
+        if filePresentationMode == .sidebar {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                showFilesPane = true
+            }
+        }
+        Task { await model.selectFile(file) }
+    }
+
+    private func popOutSelectedFile() {
+        filePresentationModeRaw = FilePresentationMode.popup.rawValue
+        withAnimation(.easeInOut(duration: 0.18)) {
+            showFilesPane = false
+        }
+    }
+
+    private func dockPopupFile() {
+        filePresentationModeRaw = FilePresentationMode.sidebar.rawValue
+        withAnimation(.easeInOut(duration: 0.18)) {
+            showFilesPane = true
+        }
     }
 }

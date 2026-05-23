@@ -335,6 +335,7 @@ private struct DateDivider: View {
 private struct MessageRow: View {
     @EnvironmentObject private var model: AppModel
     @AppStorage("riff.showFilesPane") private var showFilesPane = true
+    @AppStorage("riff.filePresentationMode") private var filePresentationModeRaw = FilePresentationMode.sidebar.rawValue
     let entry: TranscriptEntry
     let showHeader: Bool
 
@@ -445,11 +446,17 @@ private struct MessageRow: View {
     /// instead of opening it via NSWorkspace — keeps the user in the app.
     private func openAttachment(_ attachment: TranscriptAttachment) async {
         if let match = AttachmentFileMatcher.match(attachment: attachment, files: model.files) {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                showFilesPane = true
+            if filePresentationMode == .sidebar {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    showFilesPane = true
+                }
             }
             await model.selectFile(match)
         }
+    }
+
+    private var filePresentationMode: FilePresentationMode {
+        FilePresentationMode.value(from: filePresentationModeRaw)
     }
 }
 
