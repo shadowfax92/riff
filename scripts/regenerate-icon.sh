@@ -29,16 +29,30 @@ if ! command -v magick >/dev/null 2>&1; then
 fi
 
 echo "→ producing $MASTER from $SOURCE"
-TRIMMED="$(mktemp -t riff-icon).png"
-trap 'rm -f "$TRIMMED"' EXIT
+# Layout follows Apple's Big Sur icon template: design lives in the inner
+# 824×824 area of a 1024×1024 canvas (100px transparent margin all around),
+# clipped to a 185px-radius squircle. Without that margin the icon looks
+# oversized in the Dock and gets visually "cut" against neighboring apps.
+TRIMMED="$(mktemp -t riff-icon-trim).png"
+MASKED="$(mktemp -t riff-icon-mask).png"
+trap 'rm -f "$TRIMMED" "$MASKED"' EXIT
+
+# 1. Trim the source's outer letterbox and downscale to the design area.
 magick "$SOURCE" \
-  -fuzz 8% -trim +repage \
-  -resize 1024x1024 \
-  -gravity center -background black -extent 1024x1024 \
+  -fuzz 6% -trim +repage \
+  -resize 824x824^ -gravity center -extent 824x824 \
   "$TRIMMED"
+
+# 2. Apply the squircle alpha mask at the standard Big Sur radius.
 magick "$TRIMMED" \
-  \( -size 1024x1024 xc:black -fill white -draw "roundrectangle 0,0 1023,1023 184,184" \) \
+  \( -size 824x824 xc:black -fill white \
+     -draw "roundrectangle 0,0 823,823 185,185" \) \
   -alpha off -compose CopyOpacity -composite \
+  "$MASKED"
+
+# 3. Center the masked design in a 1024×1024 transparent canvas.
+magick "$MASKED" \
+  -gravity center -background none -extent 1024x1024 \
   "$MASTER"
 
 echo "→ assembling iconset"
