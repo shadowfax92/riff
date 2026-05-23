@@ -28,3 +28,17 @@ import Testing
 @Test func selectionChangeScrollsChatToBottom() {
     #expect(ChatScrollPolicy.target(for: .selectedConversationChanged) == .bottom)
 }
+
+@Test func scrollContainerIdentityChangesWithSelectedConversation() {
+    let first = ChatScrollPolicy.containerIdentity(selectedConversationID: "one")
+    let second = ChatScrollPolicy.containerIdentity(selectedConversationID: "two")
+
+    #expect(first != second)
+}
+
+@Test func scrollContainerIdentityIsStableWithoutSelection() {
+    let first = ChatScrollPolicy.containerIdentity(selectedConversationID: nil)
+    let second = ChatScrollPolicy.containerIdentity(selectedConversationID: nil)
+
+    #expect(first == second)
+}

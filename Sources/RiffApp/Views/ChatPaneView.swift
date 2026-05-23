@@ -110,6 +110,7 @@ struct ChatPaneView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 16)
             }
+            .id(ChatScrollPolicy.containerIdentity(selectedConversationID: model.selectedID))
             .onChange(of: model.transcript.count) {
                 let newCount = model.transcript.count
                 let target = ChatScrollPolicy.target(
