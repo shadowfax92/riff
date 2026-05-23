@@ -42,125 +42,41 @@ public struct RuntimeInvocationRequest: Equatable, Sendable {
     }
 }
 
+/// Stable app-facing description of a CLI runtime backed by a concrete
+/// harness for runtime-specific command construction and output parsing.
 public struct RuntimeDefinition: Sendable {
-    public var id: RuntimeID
-    public var displayName: String
-    public var binaryCandidates: [String]
-    public var versionArguments: [String]
-    public var fallbackModels: [RuntimeModelOption]
-    public var listModelsArguments: [String]?
-    public var buildInvocation: @Sendable (RuntimeInvocationRequest) -> ProcessInvocation
+    private let harness: any RuntimeHarness
 
-    public init(
-        id: RuntimeID,
-        displayName: String,
-        binaryCandidates: [String],
-        versionArguments: [String],
-        fallbackModels: [RuntimeModelOption],
-        listModelsArguments: [String]? = nil,
-        buildInvocation: @escaping @Sendable (RuntimeInvocationRequest) -> ProcessInvocation
-    ) {
-        self.id = id
-        self.displayName = displayName
-        self.binaryCandidates = binaryCandidates
-        self.versionArguments = versionArguments
-        self.fallbackModels = fallbackModels
-        self.listModelsArguments = listModelsArguments
-        self.buildInvocation = buildInvocation
+    public var id: RuntimeID { harness.id }
+    public var displayName: String { harness.displayName }
+    public var binaryCandidates: [String] { harness.binaryCandidates }
+    public var versionArguments: [String] { harness.versionArguments }
+    public var fallbackModels: [RuntimeModelOption] { harness.fallbackModels }
+    public var listModelsArguments: [String]? { harness.listModelsArguments }
+
+    public init(harness: any RuntimeHarness) {
+        self.harness = harness
+    }
+
+    /// Builds the concrete process invocation by delegating to this
+    /// definition's runtime harness.
+    public func buildInvocation(_ request: RuntimeInvocationRequest) -> ProcessInvocation {
+        harness.buildInvocation(request)
+    }
+
+    /// Parses runtime stdout by delegating to the harness that understands
+    /// that CLI's stream format.
+    public func parseResult(stdout: String) -> RuntimeTurnResult {
+        harness.parseResult(stdout: stdout)
     }
 }
 
 public enum RuntimeDefinitions {
     public static let defaultModel = RuntimeModelOption(id: "default", label: "Default (CLI config)")
 
-    public static let claude = RuntimeDefinition(
-        id: .claude,
-        displayName: "Claude Code",
-        binaryCandidates: ["claude", "openclaude"],
-        versionArguments: ["--version"],
-        fallbackModels: [
-            defaultModel,
-            RuntimeModelOption(id: "sonnet", label: "Sonnet (alias)"),
-            RuntimeModelOption(id: "opus", label: "Opus (alias)"),
-            RuntimeModelOption(id: "haiku", label: "Haiku (alias)"),
-            RuntimeModelOption(id: "claude-sonnet-4-5", label: "claude-sonnet-4-5"),
-            RuntimeModelOption(id: "claude-opus-4-5", label: "claude-opus-4-5"),
-        ]
-    ) { request in
-        var args = [
-            "-p",
-            "--input-format", "text",
-            "--output-format", "stream-json",
-            "--verbose",
-            "--permission-mode", "bypassPermissions",
-        ]
-        if let sessionID = request.sessionID, !sessionID.isEmpty {
-            args += ["--resume", sessionID]
-        }
-        if request.options.model != "default", !request.options.model.isEmpty {
-            args += ["--model", request.options.model]
-        }
-        let allowed = ([request.cwd] + request.allowedDirectories)
-            .map(\.path)
-            .filter { !$0.isEmpty }
-        if !allowed.isEmpty {
-            args += ["--add-dir"] + allowed
-        }
-        return ProcessInvocation(
-            command: "claude",
-            arguments: args,
-            stdin: request.stdin,
-            workingDirectory: request.cwd
-        )
-    }
+    public static let claude = RuntimeDefinition(harness: ClaudeRuntimeHarness())
 
-    public static let codex = RuntimeDefinition(
-        id: .codex,
-        displayName: "Codex CLI",
-        binaryCandidates: ["codex"],
-        versionArguments: ["--version"],
-        fallbackModels: [
-            defaultModel,
-            RuntimeModelOption(id: "gpt-5.5", label: "gpt-5.5"),
-            RuntimeModelOption(id: "gpt-5.4", label: "gpt-5.4"),
-            RuntimeModelOption(id: "gpt-5.3-codex", label: "gpt-5.3-codex"),
-            RuntimeModelOption(id: "gpt-5", label: "gpt-5"),
-            RuntimeModelOption(id: "o3", label: "o3"),
-            RuntimeModelOption(id: "o4-mini", label: "o4-mini"),
-        ],
-        listModelsArguments: ["debug", "models"]
-    ) { request in
-        var args: [String]
-        if let sessionID = request.sessionID, !sessionID.isEmpty {
-            args = [
-                "exec",
-                "resume",
-                "--json",
-                "--skip-git-repo-check",
-                "--dangerously-bypass-approvals-and-sandbox",
-            ]
-            appendCodexOptions(to: &args, options: request.options)
-            args += [sessionID, "-"]
-        } else {
-            args = [
-                "exec",
-                "--json",
-                "--skip-git-repo-check",
-                "--dangerously-bypass-approvals-and-sandbox",
-                "-C", request.cwd.path,
-            ]
-            for directory in request.allowedDirectories where !directory.path.isEmpty {
-                args += ["--add-dir", directory.path]
-            }
-            appendCodexOptions(to: &args, options: request.options)
-        }
-        return ProcessInvocation(
-            command: "codex",
-            arguments: args,
-            stdin: request.stdin,
-            workingDirectory: request.cwd
-        )
-    }
+    public static let codex = RuntimeDefinition(harness: CodexRuntimeHarness())
 
     public static func definition(for id: RuntimeID) -> RuntimeDefinition {
         switch id {
@@ -171,14 +87,6 @@ public enum RuntimeDefinitions {
         }
     }
 
-    private static func appendCodexOptions(to args: inout [String], options: RuntimeBuildOptions) {
-        if options.model != "default", !options.model.isEmpty {
-            args += ["--model", options.model]
-        }
-        if let reasoning = options.reasoning, reasoning != "default", !reasoning.isEmpty {
-            args += ["-c", "model_reasoning_effort=\"\(reasoning)\""]
-        }
-    }
 }
 
 public struct DetectedRuntime: Equatable, Sendable {

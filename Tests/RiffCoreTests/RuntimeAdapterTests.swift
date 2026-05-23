@@ -66,6 +66,28 @@ import Testing
     #expect(invocation.arguments.suffix(2) == ["codex-session", "-"])
 }
 
+@Test func runtimeDefinitionParsesClaudeOutputThroughHarness() {
+    let result = RuntimeDefinitions.claude.parseResult(stdout: """
+    {"type":"system","subtype":"init","session_id":"claude-session","model":"sonnet"}
+    {"type":"result","result":"hello from claude","session_id":"claude-session","model":"sonnet"}
+    """)
+
+    #expect(result.text == "hello from claude")
+    #expect(result.sessionID == "claude-session")
+    #expect(result.model == "sonnet")
+}
+
+@Test func runtimeDefinitionParsesCodexOutputThroughHarness() {
+    let result = RuntimeDefinitions.codex.parseResult(stdout: """
+    {"msg":{"type":"session_configured","session_id":"codex-session"}}
+    {"msg":{"type":"agent_message_delta","delta":"hello "}}
+    {"msg":{"type":"agent_message_delta","delta":"from codex"}}
+    """)
+
+    #expect(result.text == "hello from codex")
+    #expect(result.sessionID == "codex-session")
+}
+
 @Test func runtimeDetectionTriesFallbackBinaryAndKeepsFallbackModels() async {
     let client = FakeProcessClient(results: [
         "claude --version": ProcessResult(stdout: "", exitCode: 127),

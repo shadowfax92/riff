@@ -97,13 +97,7 @@ public final class CLIRuntimeAdapter: RuntimeAdapter, @unchecked Sendable {
                 stderr: result.stderr
             )
         }
-        let parsed: RuntimeTurnResult
-        switch definition.id {
-        case .claude:
-            parsed = RuntimeStreamParser.parseClaude(result.stdout)
-        case .codex:
-            parsed = RuntimeStreamParser.parseCodex(result.stdout)
-        }
+        let parsed = definition.parseResult(stdout: result.stdout)
         if !parsed.text.isEmpty {
             emit(.textDelta(parsed.text))
         }
