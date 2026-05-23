@@ -32,12 +32,12 @@ import Testing
     ])
 }
 
-@Test func overTargetWordCountIsWarningOnly() {
+@Test func wordCountIsRecordedWithoutWarning() {
     let response = Array(repeating: "word", count: 281).joined(separator: " ")
 
     let parsed = TurnResponseParser.parse(response)
 
     #expect(parsed.wordCount == 281)
-    #expect(parsed.warning == "Argument is 281 words; prompt target is roughly 280.")
+    #expect(parsed.warning == nil)
     #expect(parsed.text == response)
 }

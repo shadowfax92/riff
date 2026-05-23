@@ -125,7 +125,6 @@ public enum RuntimePromptBuilder {
             }
             parts.append("""
             Response contract:
-            - Write a clear chat argument of roughly 280 words.
             - If you need more detail, write it to `\(request.attachmentPath)` using your file tools.
             - If you write that file, mention `\(request.attachmentPath)` in your chat argument.
             """)

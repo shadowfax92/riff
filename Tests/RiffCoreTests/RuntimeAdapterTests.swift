@@ -247,6 +247,8 @@ import Testing
     #expect(prompt.contains("base prompt"))
     #expect(prompt.contains("ROLE_NAME:\nSecurity"))
     #expect(prompt.contains("ROLE_PROMPT:\nPressure-test trust boundaries."))
+    #expect(!prompt.contains("280"))
+    #expect(!prompt.localizedCaseInsensitiveContains("word"))
 }
 
 @Test func freshRuntimePromptListsSupportFolderPaths() {

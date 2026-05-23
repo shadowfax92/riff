@@ -15,18 +15,13 @@ public struct ParsedTurnResponse: Equatable, Sendable {
 }
 
 public enum TurnResponseParser {
-    public static let targetWordCount = 280
-
     /// Reads a model's chat response without rewriting it, recording markdown
     /// attachment paths the agent says it wrote.
     public static func parse(_ response: String) -> ParsedTurnResponse {
         let text = response.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = attachmentPaths(in: text).map(TranscriptAttachment.init(path:))
         let count = wordCount(text)
-        let warning = count > targetWordCount
-            ? "Argument is \(count) words; prompt target is roughly \(targetWordCount)."
-            : nil
-        return ParsedTurnResponse(text: text, attachments: attachments, wordCount: count, warning: warning)
+        return ParsedTurnResponse(text: text, attachments: attachments, wordCount: count)
     }
 
     public static func attachmentPaths(in text: String) -> [String] {
