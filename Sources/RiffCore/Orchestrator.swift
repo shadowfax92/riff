@@ -52,16 +52,13 @@ public actor DebateOrchestrator {
         shouldStop = true
     }
 
-    /// Runs a fresh-session summary pass with the first configured agent
+    /// Runs a fresh-session summary pass with the configured summary agent
     /// after a debate has completed. The returned entry is intentionally not
     /// written to disk; callers decide whether to display it as UI-only state.
-    public func summarize(summaryPrompt: String) async throws -> TranscriptEntry? {
+    public func summarize(summaryPrompt: String, summaryAgent: AgentProfile) async throws -> TranscriptEntry? {
         let conversation = try store.readConversation()
-        guard let agent = conversation.agents.first else {
-            throw DebateOrchestratorError.noAgents
-        }
-        guard let adapter = adapters[agent.runtime] else {
-            throw DebateOrchestratorError.missingAdapter(agent.runtime)
+        guard let adapter = adapters[summaryAgent.runtime] else {
+            throw DebateOrchestratorError.missingAdapter(summaryAgent.runtime)
         }
         let transcript = try store.readTranscript()
         guard !transcript.isEmpty else {
@@ -72,7 +69,7 @@ public actor DebateOrchestrator {
         let result = try await adapter.runTurn(
             RuntimeTurnRequest(
                 purpose: .summary,
-                agent: agent,
+                agent: summaryAgent,
                 conversationRoot: store.rootURL,
                 sessionID: nil,
                 baselinePrompt: summaryPrompt,
@@ -88,8 +85,8 @@ public actor DebateOrchestrator {
             turn: (transcript.map(\.turn).max() ?? 0) + 1,
             round: 0,
             speakerID: "summary",
-            speakerName: "Summary",
-            runtime: agent.runtime,
+            speakerName: summaryAgent.name,
+            runtime: summaryAgent.runtime,
             text: normalizeSummaryText(result.text),
             startedAt: started,
             finishedAt: finished,

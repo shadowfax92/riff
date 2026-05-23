@@ -50,28 +50,37 @@ struct ChatPaneView: View {
 
     @ViewBuilder
     private var actionButton: some View {
-        if model.isRunning {
+        HStack(spacing: 8) {
+            if model.isRunning {
+                Button {
+                    Task { await model.stopSelectedConversation() }
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else {
+                Button {
+                    model.startSelectedConversation()
+                } label: {
+                    Label(model.transcript.isEmpty ? "Start" : "Resume", systemImage: "play.fill")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(model.selectedConversation == nil || model.isSelectedConversationSummarizing)
+            }
+
             Button {
-                Task { await model.stopSelectedConversation() }
+                model.summarizeSelectedConversation()
             } label: {
-                Label("Stop", systemImage: "stop.fill")
+                Label(model.isSelectedConversationSummarizing ? "Summarizing" : "Summarize", systemImage: "text.bubble")
                     .font(.system(size: 12, weight: .medium))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-        } else {
-            // Two equivalent ways in: type a message (auto-starts) or
-            // press Start to launch the debate from the conversation
-            // prompt without sending a new message.
-            Button {
-                model.startSelectedConversation()
-            } label: {
-                Label(model.transcript.isEmpty ? "Start" : "Resume", systemImage: "play.fill")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .disabled(model.selectedConversation == nil)
+            .disabled(model.selectedConversation == nil || model.transcript.isEmpty || model.isSelectedConversationSummarizing)
         }
     }
 

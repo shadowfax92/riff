@@ -71,6 +71,28 @@ import Testing
     #expect(try store.readSummaryPrompt() == "updated summary")
 }
 
+@Test func bootstrapCreatesSummaryAgentWithoutOverwritingCustomProfile() throws {
+    let root = try temporaryDirectory()
+    let paths = RiffPaths(homeURL: root)
+    let store = ConfigStore(paths: paths)
+    let custom = AgentProfile(
+        id: "summary",
+        name: "Digest Writer",
+        role: "Summarizer",
+        runtime: .codex,
+        model: "gpt-5",
+        reasoning: "high",
+        instructions: "Summarize neutrally."
+    )
+
+    try store.bootstrap()
+    try store.writeSummaryAgent(custom)
+    try store.bootstrap()
+
+    #expect(store.summaryAgentURL.lastPathComponent == "summary-agent.json")
+    #expect(try store.readSummaryAgent() == custom)
+}
+
 @Test func creatingConversationWritesExpectedLayout() throws {
     let root = try temporaryDirectory().appending(path: "conversation", directoryHint: .isDirectory)
     let store = ConversationStore(rootURL: root)

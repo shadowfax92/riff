@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
     @Published var selectedMarkdown = ""
     @Published var basePrompt = ""
     @Published var summaryPrompt = ""
+    @Published var summaryAgent = ConfigStore.defaultSummaryAgent
     @Published var isRunning = false
     @Published var activeTurn: ActiveTurnState?
     @Published var errorMessage: String?
@@ -41,6 +42,7 @@ final class AppModel: ObservableObject {
 
     var basePromptURL: URL { configStore.basePromptURL }
     var summaryPromptURL: URL { configStore.summaryPromptURL }
+    var summaryAgentURL: URL { configStore.summaryAgentURL }
     var runtimeSettingsURL: URL { configStore.runtimeSettingsURL }
 
     /// Re-reads the base prompt from disk so the UI shows fresh content
@@ -62,9 +64,20 @@ final class AppModel: ObservableObject {
             errorMessage = String(describing: error)
         }
     }
+
+    /// Re-reads the summary agent profile used by manual and automatic
+    /// summaries without changing any debate agents.
+    func reloadSummaryAgent() {
+        do {
+            summaryAgent = try configStore.readSummaryAgent()
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
     private var selectedLocation: ConversationLocation?
     private var runningOrchestrator: DebateOrchestrator?
     private var runTask: Task<Void, Never>?
+    private var isSummarizing = false
 
     /// Initializes local config files and loads recent/default conversations
     /// into the sidebar without overwriting user-edited configs.
@@ -73,6 +86,7 @@ final class AppModel: ObservableObject {
             try configStore.bootstrap()
             basePrompt = try configStore.readBasePrompt()
             summaryPrompt = try configStore.readSummaryPrompt()
+            summaryAgent = try configStore.readSummaryAgent()
             runtimeSettings = try configStore.readRuntimeSettings()
             detectedRuntimes = await detectRuntimes()
             try reloadRows()
@@ -220,6 +234,7 @@ final class AppModel: ObservableObject {
         isRunning = true
         let store = ConversationStore(rootURL: location.url)
         let summaryPrompt = summaryPrompt
+        let summaryAgent = summaryAgent
         let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
         let orchestrator = DebateOrchestrator(
             store: store,
@@ -269,7 +284,10 @@ final class AppModel: ObservableObject {
                     completedNaturally = self.didComplete(transcript: transcript, conversation: conversation)
                 }
                 if completedNaturally {
-                    summaryEntry = try await orchestrator.summarize(summaryPrompt: summaryPrompt)
+                    summaryEntry = try await orchestrator.summarize(
+                        summaryPrompt: summaryPrompt,
+                        summaryAgent: summaryAgent
+                    )
                 }
             } catch {
                 await MainActor.run {
@@ -290,6 +308,74 @@ final class AppModel: ObservableObject {
             }
             try? self.reloadRows()
         }
+    }
+
+    /// Runs the configured summary agent in a fresh CLI session for the
+    /// selected conversation and appends the result as UI-only transcript state.
+    func summarizeSelectedConversation() {
+        guard let location = selectedLocation, !isSummarizing else {
+            return
+        }
+        guard !transcript.isEmpty else {
+            errorMessage = "No messages to summarize yet."
+            return
+        }
+        let missingRuntimes = RuntimeRequirement.missingRuntimes(
+            agents: [summaryAgent],
+            detectedRuntimes: detectedRuntimes
+        )
+        guard missingRuntimes.isEmpty else {
+            let names = missingRuntimes.map { $0.rawValue.capitalized }.joined(separator: " and ")
+            errorMessage = "\(names) unavailable. Set the missing executable path in Settings before summarizing."
+            return
+        }
+
+        isSummarizing = true
+        let store = ConversationStore(rootURL: location.url)
+        let summaryPrompt = summaryPrompt
+        let summaryAgent = summaryAgent
+        let processClient = FoundationProcessClient(environment: runtimeSettings.processEnvironment)
+        let orchestrator = DebateOrchestrator(
+            store: store,
+            adapters: [
+                .claude: CLIRuntimeAdapter(
+                    definition: RuntimeDefinitions.claude,
+                    command: detectedRuntimes[.claude]?.command,
+                    processClient: processClient
+                ),
+                .codex: CLIRuntimeAdapter(
+                    definition: RuntimeDefinitions.codex,
+                    command: detectedRuntimes[.codex]?.command,
+                    processClient: processClient
+                ),
+            ],
+            baselinePrompt: basePrompt
+        )
+
+        Task { @MainActor [weak self] in
+            var summaryEntry: TranscriptEntry?
+            do {
+                summaryEntry = try await orchestrator.summarize(
+                    summaryPrompt: summaryPrompt,
+                    summaryAgent: summaryAgent
+                )
+            } catch {
+                self?.errorMessage = String(describing: error)
+            }
+            guard let self else {
+                return
+            }
+            self.isSummarizing = false
+            await self.reloadSelected()
+            if let summaryEntry, self.selectedID == location.id {
+                self.transcript.append(summaryEntry)
+            }
+            try? self.reloadRows()
+        }
+    }
+
+    var isSelectedConversationSummarizing: Bool {
+        isSummarizing
     }
 
     func stopSelectedConversation() async {
@@ -328,19 +414,28 @@ final class AppModel: ObservableObject {
             claudePath: claudePath,
             codexPath: codexPath,
             basePrompt: basePrompt,
-            summaryPrompt: summaryPrompt
+            summaryPrompt: summaryPrompt,
+            summaryAgent: summaryAgent
         )
     }
 
     /// Persists app-wide runtime and prompt settings used by future debates.
-    func saveSettings(claudePath: String, codexPath: String, basePrompt: String, summaryPrompt: String) async {
+    func saveSettings(
+        claudePath: String,
+        codexPath: String,
+        basePrompt: String,
+        summaryPrompt: String,
+        summaryAgent: AgentProfile
+    ) async {
         do {
             let settings = RuntimeSettings(claudePath: claudePath, codexPath: codexPath)
             try configStore.writeBasePrompt(basePrompt)
             try configStore.writeSummaryPrompt(summaryPrompt)
+            try configStore.writeSummaryAgent(summaryAgent)
             try configStore.writeRuntimeSettings(settings)
             self.basePrompt = basePrompt
             self.summaryPrompt = summaryPrompt
+            self.summaryAgent = summaryAgent
             runtimeSettings = settings
             detectedRuntimes = await detectRuntimes()
         } catch {

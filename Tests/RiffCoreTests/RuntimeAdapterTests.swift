@@ -180,7 +180,7 @@ import Testing
                 name: "First Agent",
                 role: "For",
                 runtime: .claude,
-                instructions: "argue for"
+                instructions: "Summarize neutrally."
             ),
             conversationRoot: URL(fileURLWithPath: "/tmp/riff"),
             baselinePrompt: "summary instructions",
@@ -192,6 +192,7 @@ import Testing
     )
 
     #expect(prompt.contains("summary instructions"))
+    #expect(prompt.contains("SUMMARY_AGENT_PROMPT:\nSummarize neutrally."))
     #expect(prompt.contains("Debate prompt:\nWill we get AGI?"))
     #expect(prompt.contains("Full conversation:\nYou: keep it simple"))
     #expect(!prompt.contains("ROLE_PROMPT"))

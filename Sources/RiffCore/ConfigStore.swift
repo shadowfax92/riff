@@ -15,6 +15,10 @@ public struct ConfigStore: Sendable {
         paths.configURL.appending(path: "summarise_prompt.md")
     }
 
+    public var summaryAgentURL: URL {
+        paths.configURL.appending(path: "summary-agent.json")
+    }
+
     public var recentConversationsURL: URL {
         paths.configURL.appending(path: "recent-conversations.json")
     }
@@ -38,6 +42,9 @@ public struct ConfigStore: Sendable {
         if !fm.fileExists(atPath: summaryPromptURL.path) {
             try Self.defaultSummaryPrompt.write(to: summaryPromptURL, atomically: true, encoding: .utf8)
         }
+        if !fm.fileExists(atPath: summaryAgentURL.path) {
+            try writeSummaryAgent(Self.defaultSummaryAgent)
+        }
         if !fm.fileExists(atPath: recentConversationsURL.path) {
             try RiffJSON.write([ConversationLocation](), to: recentConversationsURL)
         }
@@ -54,6 +61,13 @@ public struct ConfigStore: Sendable {
         try String(contentsOf: summaryPromptURL, encoding: .utf8)
     }
 
+    public func readSummaryAgent() throws -> AgentProfile {
+        if !FileManager.default.fileExists(atPath: summaryAgentURL.path) {
+            return Self.defaultSummaryAgent
+        }
+        return try RiffJSON.read(AgentProfile.self, from: summaryAgentURL)
+    }
+
     /// Persists the shared baseline prompt used when building future agent
     /// prompts from the app's config editor.
     public func writeBasePrompt(_ prompt: String) throws {
@@ -64,6 +78,10 @@ public struct ConfigStore: Sendable {
     /// debate reaches its configured end.
     public func writeSummaryPrompt(_ prompt: String) throws {
         try RiffJSON.writeText(prompt, to: summaryPromptURL)
+    }
+
+    public func writeSummaryAgent(_ agent: AgentProfile) throws {
+        try RiffJSON.write(agent, to: summaryAgentURL)
     }
 
     public func readRuntimeSettings() throws -> RuntimeSettings {
@@ -157,4 +175,12 @@ public struct ConfigStore: Sendable {
     - Prefer short sections and bullets when useful.
     - Do not add new arguments that were not in the conversation.
     """
+
+    public static let defaultSummaryAgent = AgentProfile(
+        id: "summary",
+        name: "Summary",
+        role: "Summarizer",
+        runtime: .claude,
+        instructions: "Summarize the debate neutrally and faithfully. Do not argue a side."
+    )
 }

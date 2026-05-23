@@ -151,6 +151,10 @@ public enum RuntimePromptBuilder {
         var parts: [String] = []
         parts.append(request.baselinePrompt.trimmingCharacters(in: .whitespacesAndNewlines))
         parts.append("You are \(request.agent.name), summarizing this completed Riff debate from a fresh session.")
+        let instructions = request.agent.instructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !instructions.isEmpty {
+            parts.append("SUMMARY_AGENT_PROMPT:\n\(instructions)")
+        }
         parts.append("Debate prompt:\n\(request.conversationPrompt)")
         if request.context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append("No conversation transcript.")
