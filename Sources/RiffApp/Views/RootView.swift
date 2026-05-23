@@ -13,7 +13,6 @@ struct RootView: View {
             SidebarView(showingNewConversation: $showingNewConversation)
         } content: {
             ChatPaneView()
-                .toolbar { chatToolbar }
         } detail: {
             if showFilesPane {
                 FilePaneView()
@@ -23,6 +22,7 @@ struct RootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbar { appToolbar }
         .sheet(isPresented: $showingNewConversation) {
             NewConversationSheet {
                 showingNewConversation = false
@@ -50,8 +50,8 @@ struct RootView: View {
     }
 
     @ToolbarContentBuilder
-    private var chatToolbar: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
+    private var appToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
             Button {
                 showingSettings = true
             } label: {
@@ -60,7 +60,7 @@ struct RootView: View {
             }
             .help("Settings")
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(placement: .navigation) {
             Button {
                 cycleAppearance()
             } label: {
