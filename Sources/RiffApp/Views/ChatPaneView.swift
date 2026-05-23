@@ -1,5 +1,3 @@
-import CryptoKit
-import Foundation
 import MarkdownUI
 import RiffCore
 import SwiftUI
@@ -610,8 +608,9 @@ enum MessageGrouping {
     static func group(entries: [TranscriptEntry]) -> [MessageGroup] {
         var result: [MessageGroup] = []
         var lastEntry: TranscriptEntry?
-        for (index, entry) in entries.enumerated() {
-            let renderID = generateID(for: entry, index: index)
+        var identities = MessageRenderIdentity()
+        for entry in entries {
+            let renderID = identities.id(for: entry)
             let needsDivider: Bool
             if let last = lastEntry {
                 needsDivider = entry.startedAt.timeIntervalSince(last.startedAt) > 600
@@ -632,13 +631,19 @@ enum MessageGrouping {
         }
         return result
     }
+}
 
-    static func generateID(for entry: TranscriptEntry, index: Int) -> String {
-        let milliseconds = Int64((entry.startedAt.timeIntervalSince1970 * 1000).rounded())
-        let seed = "\(index)|\(entry.id)|\(entry.turn)|\(entry.round)|\(entry.speakerID)|\(milliseconds)"
-        return SHA256.hash(data: Data(seed.utf8))
-            .prefix(5)
-            .map { String(format: "%02x", $0) }
-            .joined()
+private struct MessageRenderIdentity {
+    private var seenCounts: [String: Int] = [:]
+
+    mutating func id(for entry: TranscriptEntry) -> String {
+        let base = entry.id.isEmpty ? fallbackID(for: entry) : entry.id
+        let count = seenCounts[base, default: 0]
+        seenCounts[base] = count + 1
+        return count == 0 ? base : "\(base)-\(count + 1)"
+    }
+
+    private func fallbackID(for entry: TranscriptEntry) -> String {
+        "\(entry.turn)-\(entry.round)-\(entry.speakerID)-\(entry.startedAt.timeIntervalSince1970)"
     }
 }

@@ -11,9 +11,7 @@ import Testing
     let ids = groups.map(\.id)
 
     #expect(Set(ids).count == ids.count)
-    #expect(ids.allSatisfy { id in
-        id.range(of: #"^(divider|message)-[a-f0-9]{10}$"#, options: .regularExpression) != nil
-    })
+    #expect(ids == ["divider-duplicate", "message-duplicate", "message-duplicate-2"])
 }
 
 private func entry(id: String, turn: Int, speakerID: String, startedAt: TimeInterval) -> TranscriptEntry {
