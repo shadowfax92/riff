@@ -3,6 +3,20 @@ import Foundation
 public enum DebateOrchestratorError: Error, Equatable {
     case noAgents
     case missingAdapter(RuntimeID)
+    case emptySummary
+}
+
+extension DebateOrchestratorError: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .noAgents:
+            return "Add at least one agent before starting the debate."
+        case .missingAdapter(let runtime):
+            return "\(runtime.rawValue.capitalized) runtime is unavailable."
+        case .emptySummary:
+            return "Summary agent returned an empty summary."
+        }
+    }
 }
 
 public actor DebateOrchestrator {
@@ -67,19 +81,32 @@ public actor DebateOrchestrator {
 
         let started = now()
         let result = try await adapter.runTurn(
-            RuntimeTurnRequest(
-                purpose: .summary,
-                agent: summaryAgent,
-                conversationRoot: store.rootURL,
-                sessionID: nil,
-                baselinePrompt: summaryPrompt,
-                conversationPrompt: conversation.prompt,
-                context: composeFullContext(transcript),
-                attachmentPath: "",
-                supportFolders: conversation.supportFolders
+            summaryRequest(
+                conversation: conversation,
+                transcript: transcript,
+                summaryPrompt: summaryPrompt,
+                summaryAgent: summaryAgent
             ),
             emit: onTurnEvent
         )
+        var summaryText = normalizeSummaryText(result.text)
+        var sessionID = result.sessionID
+        if summaryText == nil {
+            let retryResult = try await adapter.runTurn(
+                summaryRequest(
+                    conversation: conversation,
+                    transcript: transcript,
+                    summaryPrompt: retrySummaryPrompt(summaryPrompt),
+                    summaryAgent: summaryAgent
+                ),
+                emit: onTurnEvent
+            )
+            summaryText = normalizeSummaryText(retryResult.text)
+            sessionID = retryResult.sessionID
+        }
+        guard let summaryText else {
+            throw DebateOrchestratorError.emptySummary
+        }
         let finished = now()
         return TranscriptEntry(
             id: makeID(),
@@ -88,10 +115,10 @@ public actor DebateOrchestrator {
             speakerID: "summary",
             speakerName: summaryAgent.name,
             runtime: summaryAgent.runtime,
-            text: normalizeSummaryText(result.text),
+            text: summaryText,
             startedAt: started,
             finishedAt: finished,
-            sessionID: result.sessionID
+            sessionID: sessionID
         )
     }
 
@@ -264,13 +291,47 @@ public actor DebateOrchestrator {
         .joined(separator: "\n\n")
     }
 
-    private func normalizeSummaryText(_ text: String) -> String {
+    private func summaryRequest(
+        conversation: Conversation,
+        transcript: [TranscriptEntry],
+        summaryPrompt: String,
+        summaryAgent: AgentProfile
+    ) -> RuntimeTurnRequest {
+        RuntimeTurnRequest(
+            purpose: .summary,
+            agent: summaryAgent,
+            conversationRoot: store.rootURL,
+            sessionID: nil,
+            baselinePrompt: summaryPrompt,
+            conversationPrompt: conversation.prompt,
+            context: composeFullContext(transcript),
+            attachmentPath: "",
+            supportFolders: conversation.supportFolders
+        )
+    }
+
+    private func retrySummaryPrompt(_ prompt: String) -> String {
+        """
+        \(prompt.trimmingCharacters(in: .whitespacesAndNewlines))
+
+        Important: The previous summary response contained only the heading `### Summary`. Produce the complete summary body under that heading. Do not stop after the title.
+        """
+    }
+
+    private func normalizeSummaryText(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.hasPrefix("### Summary") else {
-            return trimmed
+        guard !trimmed.isEmpty else {
+            return nil
         }
-        if trimmed.isEmpty {
-            return "### Summary"
+        if trimmed.hasPrefix("### Summary") {
+            let body = String(trimmed.dropFirst("### Summary".count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return body.isEmpty ? nil : trimmed
+        }
+        if trimmed.replacingOccurrences(of: "#", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .localizedCaseInsensitiveCompare("Summary") == .orderedSame {
+            return nil
         }
         return "### Summary\n\n\(trimmed)"
     }

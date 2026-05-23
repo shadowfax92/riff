@@ -253,11 +253,48 @@ import Testing
     #expect(try store.readTranscript().count == 3)
 }
 
+@Test func SummaryGenerationRetriesHeadingOnlyRuntimeOutput() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude)])
+    try store.appendTranscript(transcriptEntry(turn: 1, speakerID: "user", speakerName: "You", text: "keep it simple"))
+    try store.appendTranscript(transcriptEntry(turn: 2, speakerID: "a1", speakerName: "Agent a1", text: "first argument"))
+    let adapter = RecordingAdapter(responses: [
+        RuntimeTurnResult(text: "### Summary", sessionID: "empty-summary"),
+        RuntimeTurnResult(text: "The debate ended with one clear argument.", sessionID: "filled-summary"),
+    ])
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    let summary = try await orchestrator.summarize(
+        summaryPrompt: "summary prompt",
+        summaryAgent: agent("summary", .claude)
+    )
+
+    let requests = await adapter.requests
+    #expect(requests.count == 2)
+    let retryRequest = try #require(requests.dropFirst().first)
+    #expect(retryRequest.baselinePrompt.contains("previous summary response contained only the heading"))
+    #expect(summary?.text == "### Summary\n\nThe debate ended with one clear argument.")
+    #expect(summary?.sessionID == "filled-summary")
+    #expect(try store.readTranscript().count == 2)
+}
+
 private actor RecordingAdapter: RuntimeAdapter {
     var requests: [RuntimeTurnRequest] = []
+    var responses: [RuntimeTurnResult]
+
+    init(responses: [RuntimeTurnResult] = []) {
+        self.responses = responses
+    }
 
     func runTurn(_ request: RuntimeTurnRequest, emit: @escaping @Sendable (RuntimeEvent) -> Void) async throws -> RuntimeTurnResult {
         requests.append(request)
+        if !responses.isEmpty {
+            return responses.removeFirst()
+        }
         return RuntimeTurnResult(
             text: "response from \(request.agent.id) at \(request.attachmentPath)",
             sessionID: "session-\(request.agent.id)",
