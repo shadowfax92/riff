@@ -36,15 +36,6 @@ struct SettingsSheet: View {
 
             HStack {
                 Button {
-                    claudePath = RuntimeSettings.defaultExecutablePath(for: .claude)
-                    codexPath = RuntimeSettings.defaultExecutablePath(for: .codex)
-                } label: {
-                    Label("Default Paths", systemImage: "arrow.counterclockwise")
-                        .font(.system(size: 12))
-                }
-                .controlSize(.small)
-
-                Button {
                     NSWorkspace.shared.activateFileViewerSelecting([model.runtimeSettingsURL])
                 } label: {
                     Label("Config", systemImage: "folder")
@@ -72,7 +63,7 @@ struct SettingsSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isSaving || claudePath.trimmedForSettings.isEmpty || codexPath.trimmedForSettings.isEmpty || basePrompt.trimmedForSettings.isEmpty || summaryPrompt.trimmedForSettings.isEmpty || !summaryAgentIsValid)
+                .disabled(isSaving || basePrompt.trimmedForSettings.isEmpty || summaryPrompt.trimmedForSettings.isEmpty || !summaryAgentIsValid)
             }
         }
         .padding(22)

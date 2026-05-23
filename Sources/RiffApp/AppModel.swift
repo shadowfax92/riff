@@ -470,13 +470,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func resetRuntimeSettings() async {
-        await saveRuntimeSettings(
-            claudePath: RuntimeSettings.defaultExecutablePath(for: .claude),
-            codexPath: RuntimeSettings.defaultExecutablePath(for: .codex)
-        )
-    }
-
     func refreshRuntimes() async {
         detectedRuntimes = await detectRuntimes()
     }
