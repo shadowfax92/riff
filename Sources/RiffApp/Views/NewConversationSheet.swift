@@ -411,6 +411,7 @@ private struct RoleEditor: View {
             TextField("Agent name", text: $role.agentName)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13, weight: .medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .background(Theme.Color.surfaceOverlay)
