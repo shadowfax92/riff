@@ -17,17 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type CreateRiffOptions struct {
-	Root           string
-	Template       string
-	Title          string
-	Prompt         string
-	PromptFile     string
-	Rounds         int
-	SupportFolders []string
-}
-
-type CreateRiffResult struct {
+type PublishDraftResult struct {
 	ID   string
 	Path string
 }
@@ -85,37 +75,37 @@ type draftAgentRef struct {
 	PromptFile string `yaml:"prompt_file"`
 }
 
-func PublishDraft(opts PublishDraftOptions) (CreateRiffResult, error) {
+func PublishDraft(opts PublishDraftOptions) (PublishDraftResult, error) {
 	root, err := rootPath(opts.Root)
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	draftPath, err := resolveDraftPath(root, opts.Name)
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	draft, err := readDraftRiff(draftPath)
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	prompt, err := readDraftPrompt(draftPath, draft)
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	agents, err := readDraftAgents(draftPath, draft.Agents)
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	if len(agents) == 0 {
-		return CreateRiffResult{}, fmt.Errorf("draft has no agent YAML files: %s", draftPath)
+		return PublishDraftResult{}, fmt.Errorf("draft has no agent YAML files: %s", draftPath)
 	}
 	conversationID, err := newUUID()
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	supportFolders, err := fileURLs(draft.SupportFolders)
 	if err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	conversationPath := filepath.Join(root, "conversations", conversationID)
 	conversation := conversationJSON{
@@ -129,12 +119,12 @@ func PublishDraft(opts PublishDraftOptions) (CreateRiffResult, error) {
 		Title:          titleOrDefault(draft.Title, opts.Name),
 	}
 	if err := writeConversation(conversationPath, conversation); err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
 	if err := rememberConversation(root, conversationID, conversationPath); err != nil {
-		return CreateRiffResult{}, err
+		return PublishDraftResult{}, err
 	}
-	return CreateRiffResult{ID: conversationID, Path: conversationPath}, nil
+	return PublishDraftResult{ID: conversationID, Path: conversationPath}, nil
 }
 
 func readDraftRiff(draftPath string) (draftRiffYAML, error) {
@@ -218,73 +208,6 @@ func draftRelativePath(draftPath string, relative string) (string, error) {
 	return filepath.Join(draftPath, cleaned), nil
 }
 
-func CreateRiff(opts CreateRiffOptions) (CreateRiffResult, error) {
-	root, err := rootPath(opts.Root)
-	if err != nil {
-		return CreateRiffResult{}, err
-	}
-	templatePath, err := resolveTemplatePath(root, opts.Template)
-	if err != nil {
-		return CreateRiffResult{}, err
-	}
-	prompt, err := readPrompt(opts, templatePath)
-	if err != nil {
-		return CreateRiffResult{}, err
-	}
-	agents, err := readAgents(templatePath)
-	if err != nil {
-		return CreateRiffResult{}, err
-	}
-	if len(agents) == 0 {
-		return CreateRiffResult{}, fmt.Errorf("template has no role YAML files: %s", templatePath)
-	}
-	conversationID, err := newUUID()
-	if err != nil {
-		return CreateRiffResult{}, err
-	}
-	supportFolders, err := fileURLs(opts.SupportFolders)
-	if err != nil {
-		return CreateRiffResult{}, err
-	}
-	conversationPath := filepath.Join(root, "conversations", conversationID)
-	conversation := conversationJSON{
-		Agents:         agents,
-		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
-		ID:             conversationID,
-		MaxRounds:      roundsOrDefault(opts.Rounds),
-		Prompt:         prompt,
-		Status:         "idle",
-		SupportFolders: supportFolders,
-		Title:          titleOrDefault(opts.Title, opts.Template),
-	}
-	if err := writeConversation(conversationPath, conversation); err != nil {
-		return CreateRiffResult{}, err
-	}
-	if err := rememberConversation(root, conversationID, conversationPath); err != nil {
-		return CreateRiffResult{}, err
-	}
-	return CreateRiffResult{ID: conversationID, Path: conversationPath}, nil
-}
-
-func readPrompt(opts CreateRiffOptions, templatePath string) (string, error) {
-	if strings.TrimSpace(opts.Prompt) != "" && strings.TrimSpace(opts.PromptFile) != "" {
-		return "", errors.New("use --prompt or --prompt-file, not both")
-	}
-	if strings.TrimSpace(opts.PromptFile) != "" {
-		return readPromptFile(expandHome(opts.PromptFile))
-	}
-	if strings.TrimSpace(opts.Prompt) == "" {
-		promptPath := filepath.Join(templatePath, "prompt.md")
-		if _, err := os.Stat(promptPath); err == nil {
-			return readPromptFile(promptPath)
-		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return "", err
-		}
-		return "", errors.New("prompt is required; edit template prompt.md or pass --prompt/--prompt-file")
-	}
-	return opts.Prompt, nil
-}
-
 func readPromptFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -295,33 +218,6 @@ func readPromptFile(path string) (string, error) {
 		return "", fmt.Errorf("prompt file is empty: %s", path)
 	}
 	return prompt, nil
-}
-
-func readAgents(templatePath string) ([]agentJSON, error) {
-	files, err := filepath.Glob(filepath.Join(templatePath, "role-*.yaml"))
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(files, func(i, j int) bool {
-		return roleFileIndex(files[i]) < roleFileIndex(files[j])
-	})
-	agents := make([]agentJSON, 0, len(files))
-	for i, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		var role roleYAML
-		if err := yaml.Unmarshal(data, &role); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", file, err)
-		}
-		agent, err := agentFromRole(role, i+1, file)
-		if err != nil {
-			return nil, err
-		}
-		agents = append(agents, agent)
-	}
-	return agents, nil
 }
 
 func agentFromRole(role roleYAML, index int, file string) (agentJSON, error) {
@@ -417,28 +313,6 @@ func writeJSON(path string, value any) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
-}
-
-func resolveTemplatePath(root string, template string) (string, error) {
-	template = strings.TrimSpace(template)
-	if template == "" {
-		return "", errors.New("template name or path is required")
-	}
-	expanded := expandHome(template)
-	if filepath.IsAbs(expanded) || strings.HasPrefix(template, ".") {
-		if info, err := os.Stat(expanded); err == nil && info.IsDir() {
-			return expanded, nil
-		} else if err != nil {
-			return "", err
-		}
-	}
-	path := filepath.Join(root, "templates", slug(template))
-	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		return path, nil
-	} else if err != nil {
-		return "", err
-	}
-	return path, nil
 }
 
 func resolveDraftPath(root string, draft string) (string, error) {

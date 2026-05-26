@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestCreateRiffFromTemplateWritesAppConversationLayout(t *testing.T) {
+func TestPublishDraftWritesAppConversationLayout(t *testing.T) {
 	root := t.TempDir()
 	draftPath := filepath.Join(root, "drafts", "architecture-debate")
 	if err := os.MkdirAll(filepath.Join(draftPath, "agents"), 0755); err != nil {
@@ -91,7 +91,7 @@ instructions: |
 	}
 }
 
-func TestCreateRiffDefaultsToTemplatePromptFile(t *testing.T) {
+func TestPublishDraftDefaultsToPromptFile(t *testing.T) {
 	root := t.TempDir()
 	draftPath := filepath.Join(root, "drafts", "default-prompt")
 	if err := os.MkdirAll(filepath.Join(draftPath, "agents"), 0755); err != nil {

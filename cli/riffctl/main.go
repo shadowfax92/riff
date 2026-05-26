@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -52,7 +53,7 @@ func createDraft(args []string) error {
 	for _, file := range result.RoleFiles {
 		fmt.Printf("  %s\n", file)
 	}
-	fmt.Printf("Next: edit the draft files, then run riffctl publish %s\n", opts.Name)
+	fmt.Printf("Next: edit the draft files, then run riffctl publish %s\n", filepath.Base(result.Path))
 	return nil
 }
 
@@ -197,65 +198,6 @@ func parseCreateDraftArgs(args []string) (drafts.CreateDraftOptions, error) {
 				return opts, fmt.Errorf("unexpected argument: %s", args[i])
 			}
 			opts.Roles = roles
-		}
-	}
-	return opts, nil
-}
-
-func parseCreateRiffArgs(args []string) (riffs.CreateRiffOptions, error) {
-	opts := riffs.CreateRiffOptions{Rounds: 10}
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--title":
-			value, ok := nextValue(args, &i, "--title")
-			if !ok {
-				return opts, fmt.Errorf("--title requires a value")
-			}
-			opts.Title = value
-		case "--prompt":
-			value, ok := nextValue(args, &i, "--prompt")
-			if !ok {
-				return opts, fmt.Errorf("--prompt requires a value")
-			}
-			opts.Prompt = value
-		case "--prompt-file":
-			value, ok := nextValue(args, &i, "--prompt-file")
-			if !ok {
-				return opts, fmt.Errorf("--prompt-file requires a value")
-			}
-			opts.PromptFile = value
-		case "--rounds", "-r":
-			value, ok := nextValue(args, &i, "--rounds")
-			if !ok {
-				return opts, fmt.Errorf("--rounds requires a value")
-			}
-			rounds, err := strconv.Atoi(value)
-			if err != nil {
-				return opts, fmt.Errorf("invalid --rounds value %q", value)
-			}
-			opts.Rounds = rounds
-		case "--support-folder", "--folder":
-			flag := args[i]
-			value, ok := nextValue(args, &i, "--support-folder")
-			if !ok {
-				return opts, fmt.Errorf("%s requires a value", flag)
-			}
-			opts.SupportFolders = append(opts.SupportFolders, value)
-		case "--root":
-			value, ok := nextValue(args, &i, "--root")
-			if !ok {
-				return opts, fmt.Errorf("--root requires a value")
-			}
-			opts.Root = value
-		default:
-			if strings.HasPrefix(args[i], "-") {
-				return opts, fmt.Errorf("unknown flag: %s", args[i])
-			}
-			if opts.Template == "" {
-				opts.Template = args[i]
-				continue
-			}
-			return opts, fmt.Errorf("unexpected argument: %s", args[i])
 		}
 	}
 	return opts, nil

@@ -59,6 +59,19 @@ func TestTemplateCreateUsesSeparatePath(t *testing.T) {
 	}
 }
 
+func TestCreateDraftPrintsSluggedPublishCommand(t *testing.T) {
+	root := t.TempDir()
+
+	output := captureStdout(t, func() {
+		if err := run([]string{"create", "QA Verify", "--title", "QA Verify", "--root", root}); err != nil {
+			t.Fatalf("create draft returned error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "riffctl publish qa-verify") {
+		t.Fatalf("output missing slugged publish command:\n%s", output)
+	}
+}
+
 func TestOldCreateAgentCreateRiffAndCreateTemplateFormsAreRejected(t *testing.T) {
 	root := t.TempDir()
 
