@@ -39,7 +39,7 @@ open ~/Applications/Riff.app
 
 ```sh
 cd cli/riffctl
-go run . create agent architecture-debate --roles 3
+go run . create template architecture-debate --roles 3
 ```
 
 This creates:
@@ -54,7 +54,7 @@ This creates:
 Edit `prompt.md` with the debate topic, and edit each role YAML with the agent name, runtime, model, reasoning, emoji, and instructions. Riff automatically applies `~/.riff/config/base_prompt.md` when the riff runs. Then create the riff:
 
 ```sh
-go run . create riff architecture-debate --title "Architecture debate"
+go run . create architecture-debate --title "Architecture debate"
 ```
 
 This writes a real idle conversation to `~/.riff/conversations/<id>/`. Open Riff and the new riff appears in the sidebar; click **Start** to run it.
