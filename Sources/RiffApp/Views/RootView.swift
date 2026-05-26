@@ -73,6 +73,9 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .riffNewConversation)) { _ in
             showingNewConversation = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .riffOpenSettings)) { _ in
+            showingSettings = true
+        }
     }
 
     @ToolbarContentBuilder

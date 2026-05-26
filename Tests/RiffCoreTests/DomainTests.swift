@@ -42,6 +42,46 @@ import Testing
     #expect(agent.instructions == "Pressure-test the threat model.")
 }
 
+@Test func roleDraftFromAgentPreservesIdentityForForking() {
+    let agent = AgentProfile(
+        id: "fox",
+        name: "Fox",
+        role: "Fox",
+        runtime: .codex,
+        model: "gpt-5.1",
+        reasoning: "high",
+        instructions: "Argue the contrarian case.",
+        emoji: "🦊"
+    )
+
+    let draft = RoleDraft(agent: agent)
+
+    #expect(draft.id == "fox")
+    #expect(draft.roleName == "Fox")
+    #expect(draft.rolePrompt == "Argue the contrarian case.")
+    #expect(draft.runtime == .codex)
+    #expect(draft.model == "gpt-5.1")
+    #expect(draft.reasoning == "high")
+    #expect(draft.emoji == "🦊")
+}
+
+@Test func roleDraftFromAgentRoundTripsBackToAgentProfile() {
+    let agent = AgentProfile(
+        id: "wolf",
+        name: "Wolf",
+        role: "Wolf",
+        runtime: .claude,
+        model: "default",
+        reasoning: nil,
+        instructions: "Pressure-test every claim.",
+        emoji: "🐺"
+    )
+
+    let restored = RoleDraft(agent: agent).agentProfile(index: 1)
+
+    #expect(restored == agent)
+}
+
 @Test func roleDraftWithoutNameOrPromptIsInvalid() {
     let draft = RoleDraft(
         id: "role-1",

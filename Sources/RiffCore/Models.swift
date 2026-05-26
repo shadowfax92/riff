@@ -71,6 +71,22 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
         self.emoji = emoji
     }
 
+    /// Rehydrates an editable role draft from a persisted agent profile —
+    /// the inverse of `agentProfile(index:)`. Used when forking a
+    /// conversation so the New Riff sheet opens pre-filled with its roles.
+    /// The agent's id is preserved so the fork keeps the same avatar colors.
+    public init(agent: AgentProfile) {
+        self.init(
+            id: agent.id,
+            roleName: agent.name,
+            rolePrompt: agent.instructions,
+            runtime: agent.runtime,
+            model: agent.model,
+            reasoning: agent.reasoning,
+            emoji: agent.emoji
+        )
+    }
+
     public var isValid: Bool {
         !roleName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !rolePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

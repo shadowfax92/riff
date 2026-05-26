@@ -7,6 +7,7 @@ struct ChatPaneView: View {
     @State private var draft = ""
     @State private var lastTranscriptCount = 0
     @State private var showingDetails = false
+    @State private var forkSeed: Conversation?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,6 +27,16 @@ struct ChatPaneView: View {
                     showingDetails = false
                 }
             }
+        }
+        .sheet(item: $forkSeed) { seed in
+            NewConversationSheet(seed: seed) {
+                // The sheet dismisses itself via `dismiss()`; route through a
+                // notification so RootView can surface Settings afterward.
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .riffOpenSettings, object: nil)
+                }
+            }
+            .environmentObject(model)
         }
     }
 
@@ -83,6 +94,17 @@ struct ChatPaneView: View {
                 .controlSize(.small)
                 .disabled(model.selectedConversation == nil || model.isSelectedConversationSummarizing)
             }
+
+            Button {
+                forkSeed = model.selectedConversation
+            } label: {
+                Label("Fork", systemImage: "arrow.triangle.branch")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(model.selectedConversation == nil)
+            .help("Start a new chat pre-filled with this Riff's setup")
 
             Button {
                 showingDetails = true

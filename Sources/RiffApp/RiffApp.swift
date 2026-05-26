@@ -33,4 +33,5 @@ struct RiffApp: App {
 
 extension Notification.Name {
     static let riffNewConversation = Notification.Name("riff.newConversation")
+    static let riffOpenSettings = Notification.Name("riff.openSettings")
 }

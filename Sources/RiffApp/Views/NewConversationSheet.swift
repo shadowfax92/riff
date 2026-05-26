@@ -5,23 +5,39 @@ import SwiftUI
 struct NewConversationSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    private let seed: Conversation?
     let onOpenSettings: () -> Void
-    @State private var title = ""
-    @State private var prompt = ""
-    @State private var maxRounds = 10
-    @State private var supportFolders: [URL] = []
+    @State private var title: String
+    @State private var prompt: String
+    @State private var maxRounds: Int
+    @State private var supportFolders: [URL]
     @State private var choosingSupportFolder = false
-    @State private var roleDrafts: [RoleDraft] = {
-        [RoleDraftFactory.initial()]
-    }()
+    @State private var roleDrafts: [RoleDraft]
 
-    init(onOpenSettings: @escaping () -> Void = {}) {
+    /// When `seed` is non-nil the sheet acts as a fork: every field is
+    /// pre-filled from the source conversation so the user can tweak the
+    /// setup and launch a fresh debate. The title gets a "(fork)" suffix so
+    /// it stays distinct in the sidebar.
+    init(seed: Conversation? = nil, onOpenSettings: @escaping () -> Void = {}) {
+        self.seed = seed
         self.onOpenSettings = onOpenSettings
+        _title = State(initialValue: seed.map { "\($0.title) (fork)" } ?? "")
+        _prompt = State(initialValue: seed?.prompt ?? "")
+        _maxRounds = State(initialValue: seed?.maxRounds ?? 10)
+        _supportFolders = State(initialValue: seed?.supportFolders ?? [])
+        _roleDrafts = State(initialValue: Self.seededRoleDrafts(from: seed))
+    }
+
+    private static func seededRoleDrafts(from seed: Conversation?) -> [RoleDraft] {
+        guard let seed, !seed.agents.isEmpty else {
+            return [RoleDraftFactory.initial()]
+        }
+        return seed.agents.map { RoleDraft(agent: $0) }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("New Riff")
+            Text(seed == nil ? "New Riff" : "Fork Riff")
                 .font(.system(size: 20, weight: .semibold))
 
             ScrollView {
