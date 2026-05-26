@@ -107,6 +107,19 @@ final class AppModel: ObservableObject {
             runtimeSettings = try configStore.readRuntimeSettings()
             detectedRuntimes = await detectRuntimes()
             try reloadRows()
+            await selectRowAfterReload(preferredID: selectedID)
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
+    /// Re-scans conversation folders so riffs created by the Go CLI appear
+    /// when the app launches or returns to the foreground.
+    func refreshRowsFromDisk() async {
+        do {
+            let preferredID = selectedID
+            try reloadRows()
+            await selectRowAfterReload(preferredID: preferredID)
         } catch {
             errorMessage = String(describing: error)
         }
@@ -627,6 +640,18 @@ final class AppModel: ObservableObject {
             return ConversationRow(location: location, conversation: conversation, preview: preview)
         }
         .sorted { $0.conversation.createdAt > $1.conversation.createdAt }
+    }
+
+    private func selectRowAfterReload(preferredID: String?) async {
+        if let preferredID, let row = rows.first(where: { $0.id == preferredID }) {
+            await select(row)
+            return
+        }
+        if let first = rows.first {
+            await select(first)
+        } else {
+            clearSelection()
+        }
     }
 
     private func defaultConversationLocations() throws -> [ConversationLocation] {

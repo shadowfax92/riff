@@ -33,6 +33,31 @@ open ~/Applications/Riff.app
 
 `make open` builds and launches without installing. `swift test` runs the unit tests.
 
+## CLI
+
+`riffctl` is a small Go helper for creating role template files under `~/.riff/templates`, then turning those files into an app-visible riff under `~/.riff/conversations`.
+
+```sh
+cd cli/riffctl
+go run . create agent architecture-debate --roles 3
+```
+
+This creates:
+
+```text
+~/.riff/templates/architecture-debate/role-1.yaml
+~/.riff/templates/architecture-debate/role-2.yaml
+~/.riff/templates/architecture-debate/role-3.yaml
+```
+
+Edit each role YAML with the agent name, runtime, model, reasoning, emoji, and instructions. Then create the riff:
+
+```sh
+go run . create riff architecture-debate --title "Architecture debate" --prompt-file ./prompt.md
+```
+
+This writes a real idle conversation to `~/.riff/conversations/<id>/`. Open Riff and the new riff appears in the sidebar; click **Start** to run it.
+
 ## How it works
 
 - **`RiffCore`** — pure logic. Stores, the orchestrator that loops through agents, the CLI adapters that shell out to `claude -p` / `codex exec`, the prompt builder.
