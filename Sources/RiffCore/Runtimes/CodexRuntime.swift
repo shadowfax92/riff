@@ -78,6 +78,13 @@ public struct CodexRuntimeHarness: RuntimeHarness {
                 text += delta
             } else if type == "agent_message", let message = object["message"] as? String {
                 text = message
+            } else if type == "agent_message", let message = object["text"] as? String {
+                text = message
+            } else if type == "item.completed",
+                      let item = object["item"] as? [String: Any],
+                      item["type"] as? String == "agent_message",
+                      let message = item["text"] as? String {
+                text = message
             } else if type.contains("session") {
                 sessionID = RuntimeOutputParsing.firstString(
                     object,

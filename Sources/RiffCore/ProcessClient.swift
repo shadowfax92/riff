@@ -76,16 +76,36 @@ public final class FoundationProcessClient: ProcessClient, @unchecked Sendable {
                 let stdout = Pipe()
                 let stderr = Pipe()
                 let stdin = Pipe()
+                let stdoutBuffer = ProcessOutputBuffer()
+                let stderrBuffer = ProcessOutputBuffer()
                 process.standardOutput = stdout
                 process.standardError = stderr
                 process.standardInput = stdin
+                stdout.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if data.isEmpty {
+                        handle.readabilityHandler = nil
+                    } else {
+                        stdoutBuffer.append(data)
+                    }
+                }
+                stderr.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if data.isEmpty {
+                        handle.readabilityHandler = nil
+                    } else {
+                        stderrBuffer.append(data)
+                    }
+                }
 
                 process.terminationHandler = { process in
-                    let outputData = stdout.fileHandleForReading.readDataToEndOfFile()
-                    let errorData = stderr.fileHandleForReading.readDataToEndOfFile()
+                    stdout.fileHandleForReading.readabilityHandler = nil
+                    stderr.fileHandleForReading.readabilityHandler = nil
+                    stdoutBuffer.append(stdout.fileHandleForReading.readDataToEndOfFile())
+                    stderrBuffer.append(stderr.fileHandleForReading.readDataToEndOfFile())
                     guard
-                        let output = String(data: outputData, encoding: .utf8),
-                        let error = String(data: errorData, encoding: .utf8)
+                        let output = stdoutBuffer.string(encoding: .utf8),
+                        let error = stderrBuffer.string(encoding: .utf8)
                     else {
                         let error = ProcessClientError.failedToDecodeOutput
                         logger?.processFailed(id: logID, error: error, startedAt: startedAt, finishedAt: Date())
@@ -210,5 +230,26 @@ private final class ProcessRunState: @unchecked Sendable {
         process = nil
         lock.unlock()
         return continuation
+    }
+}
+
+private final class ProcessOutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+
+    func append(_ chunk: Data) {
+        guard !chunk.isEmpty else {
+            return
+        }
+        lock.lock()
+        data.append(chunk)
+        lock.unlock()
+    }
+
+    func string(encoding: String.Encoding) -> String? {
+        lock.lock()
+        let snapshot = data
+        lock.unlock()
+        return String(data: snapshot, encoding: encoding)
     }
 }

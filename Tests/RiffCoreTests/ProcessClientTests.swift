@@ -88,6 +88,19 @@ import Testing
     }
 }
 
+@Test func processClientDrainsLargeStdoutWhileProcessRuns() async throws {
+    let client = FoundationProcessClient()
+
+    let result = try await client.run(ProcessInvocation(
+        command: "/usr/bin/python3",
+        arguments: ["-c", "import sys; sys.stdout.write('x' * 200000); sys.stdout.flush()"],
+        timeout: 2
+    ))
+
+    #expect(result.exitCode == 0)
+    #expect(result.stdout.count == 200_000)
+}
+
 private func processClientTemporaryDirectory() throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appending(path: "riff-process-client-tests-\(UUID().uuidString)", directoryHint: .isDirectory)

@@ -144,6 +144,18 @@ import Testing
     #expect(result.sessionID == "codex-session")
 }
 
+@Test func runtimeDefinitionParsesCurrentCodexItemCompletedOutput() {
+    let result = RuntimeDefinitions.codex.parseResult(stdout: """
+    {"type":"thread.started","thread_id":"codex-thread"}
+    {"type":"turn.started"}
+    {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"hello from current codex"}}
+    {"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}
+    """)
+
+    #expect(result.text == "hello from current codex")
+    #expect(result.sessionID == "codex-thread")
+}
+
 @Test func runtimeDetectionTriesFallbackBinaryAndKeepsFallbackModels() async {
     let client = FakeProcessClient(results: [
         "claude --version": ProcessResult(stdout: "", exitCode: 127),
