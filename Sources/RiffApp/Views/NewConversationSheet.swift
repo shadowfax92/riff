@@ -332,39 +332,15 @@ private struct RoleEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 AgentAvatar(
-                    initials: AgentAvatar.initials(from: role.roleName.isEmpty ? "?" : role.roleName),
+                    initials: AgentAvatar.initials(from: role.agentName.isEmpty ? "?" : role.agentName),
                     emoji: role.emoji,
                     color: Theme.color(forSpeakerID: role.id, runtime: role.runtime),
                     size: 28
                 )
-                TextField("ROLE_NAME", text: $role.roleName)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Theme.Color.surfaceOverlay)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Theme.Color.surfaceStroke)
-                    )
-                Picker("", selection: $role.runtime) {
-                    ForEach(RuntimeID.allCases) { runtime in
-                        Text(runtime.rawValue.capitalized).tag(runtime)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-                .labelsHidden()
-                .onChange(of: role.runtime) { _, newRuntime in
-                    role.model = "default"
-                    if let reasoning = role.reasoning,
-                       !reasoningOptions(for: newRuntime).contains(where: { $0.id == reasoning }) {
-                        role.reasoning = nil
-                    }
-                }
+                agentNameField
+                runtimePicker
                 if canDelete {
                     Button {
                         onDelete()
@@ -373,6 +349,7 @@ private struct RoleEditor: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .padding(.bottom, 7)
                 }
             }
 
@@ -424,6 +401,45 @@ private struct RoleEditor: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Theme.Color.surfaceStroke)
         )
+    }
+
+    private var agentNameField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Agent name")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField("Agent name", text: $role.agentName)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Theme.Color.surfaceOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.Color.surfaceStroke)
+                )
+        }
+    }
+
+    private var runtimePicker: some View {
+        Picker("", selection: $role.runtime) {
+            ForEach(RuntimeID.allCases) { runtime in
+                Text(runtime.rawValue.capitalized).tag(runtime)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 160)
+        .labelsHidden()
+        .padding(.bottom, 1)
+        .onChange(of: role.runtime) { _, newRuntime in
+            role.model = "default"
+            if let reasoning = role.reasoning,
+               !reasoningOptions(for: newRuntime).contains(where: { $0.id == reasoning }) {
+                role.reasoning = nil
+            }
+        }
     }
 
     private func fieldWithLabel<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {

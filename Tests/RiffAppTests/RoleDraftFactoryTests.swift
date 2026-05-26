@@ -21,6 +21,7 @@ import Testing
     #expect(draft.reasoning == "high")
     #expect(draft.rolePrompt == "")
     #expect(!draft.roleName.isEmpty)
+    #expect(draft.agentName == draft.roleName)
 }
 
 @Test func initialRoleDraftDefaultsToClaudeDefaultModel() {
@@ -31,4 +32,5 @@ import Testing
     #expect(draft.reasoning == nil)
     #expect(draft.rolePrompt == "")
     #expect(!draft.roleName.isEmpty)
+    #expect(!draft.agentName.isEmpty)
 }
