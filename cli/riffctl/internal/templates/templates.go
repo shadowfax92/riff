@@ -108,8 +108,7 @@ func roleYAML(index int) string {
 runtime: claude
 model: default
 reasoning: ""
-emoji: ""
-instructions: |
+role_prompt: |
   Make a sharp case for...
 `, roleName)
 }

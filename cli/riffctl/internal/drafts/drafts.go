@@ -27,20 +27,19 @@ type CreateDraftOptions struct {
 type CreateDraftResult struct {
 	Path      string
 	RiffYAML  string
-	Prompt    string
 	RoleFiles []string
 }
 
 type riffYAML struct {
 	Title          string     `yaml:"title"`
-	PromptFile     string     `yaml:"prompt_file"`
+	Prompt         string     `yaml:"prompt"`
 	Rounds         int        `yaml:"rounds"`
 	SupportFolders []string   `yaml:"support_folders"`
 	Agents         []agentRef `yaml:"agents"`
 }
 
 type agentRef struct {
-	PromptFile string `yaml:"prompt_file"`
+	RoleFile string `yaml:"role_file"`
 }
 
 func CreateDraft(opts CreateDraftOptions) (CreateDraftResult, error) {
@@ -55,10 +54,6 @@ func CreateDraft(opts CreateDraftOptions) (CreateDraftResult, error) {
 	if err := prepareDraftDirectory(draftPath, opts.Force); err != nil {
 		return CreateDraftResult{}, err
 	}
-	promptPath, err := writePromptFile(draftPath, opts)
-	if err != nil {
-		return CreateDraftResult{}, err
-	}
 	roleFiles, err := writeRoleFiles(draftPath, opts.Roles)
 	if err != nil {
 		return CreateDraftResult{}, err
@@ -67,7 +62,7 @@ func CreateDraft(opts CreateDraftOptions) (CreateDraftResult, error) {
 	if err != nil {
 		return CreateDraftResult{}, err
 	}
-	return CreateDraftResult{Path: draftPath, RiffYAML: riffPath, Prompt: promptPath, RoleFiles: roleFiles}, nil
+	return CreateDraftResult{Path: draftPath, RiffYAML: riffPath, RoleFiles: roleFiles}, nil
 }
 
 func validateOptions(opts CreateDraftOptions) error {
@@ -100,8 +95,7 @@ func prepareDraftDirectory(path string, force bool) error {
 	return os.MkdirAll(filepath.Join(path, "agents"), 0755)
 }
 
-func writePromptFile(draftPath string, opts CreateDraftOptions) (string, error) {
-	path := filepath.Join(draftPath, "prompt.md")
+func promptContents(opts CreateDraftOptions) (string, error) {
 	contents := defaultPromptMarkdown()
 	if strings.TrimSpace(opts.PromptFile) != "" {
 		data, err := os.ReadFile(expandHome(opts.PromptFile))
@@ -112,10 +106,7 @@ func writePromptFile(draftPath string, opts CreateDraftOptions) (string, error) 
 	} else if strings.TrimSpace(opts.Prompt) != "" {
 		contents = opts.Prompt
 	}
-	if err := os.WriteFile(path, []byte(ensureTrailingNewline(contents)), 0644); err != nil {
-		return "", err
-	}
-	return path, nil
+	return ensureTrailingNewline(contents), nil
 }
 
 func writeRoleFiles(draftPath string, roles int) ([]string, error) {
@@ -137,11 +128,15 @@ func writeRiffYAML(draftPath string, opts CreateDraftOptions, roleFiles []string
 		if err != nil {
 			return "", err
 		}
-		refs = append(refs, agentRef{PromptFile: filepath.ToSlash(relative)})
+		refs = append(refs, agentRef{RoleFile: filepath.ToSlash(relative)})
+	}
+	prompt, err := promptContents(opts)
+	if err != nil {
+		return "", err
 	}
 	data, err := yaml.Marshal(riffYAML{
 		Title:          titleOrDefault(opts.Title, opts.Name),
-		PromptFile:     "prompt.md",
+		Prompt:         prompt,
 		Rounds:         opts.Rounds,
 		SupportFolders: opts.SupportFolders,
 		Agents:         refs,
@@ -162,8 +157,7 @@ func roleYAML(index int) string {
 runtime: claude
 model: default
 reasoning: ""
-emoji: ""
-instructions: |
+role_prompt: |
   Make a sharp case for...
 `, roleName)
 }

@@ -15,29 +15,27 @@ func TestPublishDraftWritesAppConversationLayout(t *testing.T) {
 		t.Fatalf("create draft dir: %v", err)
 	}
 	writeFile(t, filepath.Join(draftPath, "riff.yaml"), `title: Architecture debate
-prompt_file: prompt.md
+prompt: |
+  Should we build the CLI?
 rounds: 10
 support_folders:
   - ~/Workspaces/research
 agents:
-  - prompt_file: agents/role-1.yaml
-  - prompt_file: agents/role-2.yaml
+  - role_file: agents/role-1.yaml
+  - role_file: agents/role-2.yaml
 `)
-	writeFile(t, filepath.Join(draftPath, "prompt.md"), "Should we build the CLI?\n")
 	writeFile(t, filepath.Join(draftPath, "agents", "role-1.yaml"), `name: Critic
 runtime: claude
 model: default
 reasoning: ""
-emoji: C
-instructions: |
+role_prompt: |
   Find the weakest assumption.
 `)
 	writeFile(t, filepath.Join(draftPath, "agents", "role-2.yaml"), `name: Researcher
 runtime: codex
 model: gpt-5.1
 reasoning: high
-emoji: R
-instructions: |
+role_prompt: |
   Bring evidence and citations.
 `)
 
@@ -74,6 +72,12 @@ instructions: |
 	if conversation.Agents[0].Name != "Critic" || conversation.Agents[0].Runtime != "claude" {
 		t.Fatalf("first agent not loaded from YAML: %+v", conversation.Agents[0])
 	}
+	if conversation.Agents[0].Instructions != "Find the weakest assumption." {
+		t.Fatalf("first agent role prompt not loaded from YAML: %+v", conversation.Agents[0])
+	}
+	if conversation.Agents[0].Emoji != "" {
+		t.Fatalf("first agent emoji should not be loaded from YAML: %+v", conversation.Agents[0])
+	}
 	if conversation.Agents[1].Name != "Researcher" || conversation.Agents[1].Reasoning != "high" {
 		t.Fatalf("second agent not loaded from YAML: %+v", conversation.Agents[1])
 	}
@@ -91,40 +95,26 @@ instructions: |
 	}
 }
 
-func TestPublishDraftDefaultsToPromptFile(t *testing.T) {
+func TestPublishDraftRequiresInlinePrompt(t *testing.T) {
 	root := t.TempDir()
-	draftPath := filepath.Join(root, "drafts", "default-prompt")
+	draftPath := filepath.Join(root, "drafts", "missing-prompt")
 	if err := os.MkdirAll(filepath.Join(draftPath, "agents"), 0755); err != nil {
 		t.Fatalf("create draft dir: %v", err)
 	}
-	writeFile(t, filepath.Join(draftPath, "riff.yaml"), `title: Default prompt
+	writeFile(t, filepath.Join(draftPath, "riff.yaml"), `title: Missing prompt
 rounds: 1
 agents:
-  - prompt_file: agents/role-1.yaml
+  - role_file: agents/role-1.yaml
 `)
-	writeFile(t, filepath.Join(draftPath, "prompt.md"), "Use the draft prompt by default.\n")
 	writeFile(t, filepath.Join(draftPath, "agents", "role-1.yaml"), `name: Critic
 runtime: claude
 model: default
-instructions: |
+role_prompt: |
   Argue clearly.
 `)
 
-	result, err := PublishDraft(PublishDraftOptions{Root: root, Name: "default-prompt"})
-	if err != nil {
-		t.Fatalf("PublishDraft returned error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(result.Path, "conversation.json"))
-	if err != nil {
-		t.Fatalf("read conversation.json: %v", err)
-	}
-	var conversation conversationJSON
-	if err := json.Unmarshal(data, &conversation); err != nil {
-		t.Fatalf("decode conversation.json: %v", err)
-	}
-	if conversation.Prompt != "Use the draft prompt by default.\n" {
-		t.Fatalf("prompt = %q", conversation.Prompt)
+	if _, err := PublishDraft(PublishDraftOptions{Root: root, Name: "missing-prompt"}); err == nil {
+		t.Fatal("PublishDraft returned nil error for missing inline prompt")
 	}
 }
 

@@ -49,7 +49,6 @@ func createDraft(args []string) error {
 	}
 	fmt.Printf("Created riff draft: %s\n", result.Path)
 	fmt.Printf("  %s\n", result.RiffYAML)
-	fmt.Printf("  %s\n", result.Prompt)
 	for _, file := range result.RoleFiles {
 		fmt.Printf("  %s\n", file)
 	}
@@ -250,7 +249,6 @@ Examples:
 
 Output:
   ~/.riff/drafts/qa-verify/riff.yaml
-  ~/.riff/drafts/qa-verify/prompt.md
   ~/.riff/drafts/qa-verify/agents/role-1.yaml
   ~/.riff/drafts/qa-verify/agents/role-2.yaml
   ~/.riff/drafts/qa-verify/agents/role-3.yaml
@@ -258,8 +256,8 @@ Output:
 
 Workflow for another AI agent:
   1. Run: riffctl create qa-verify --title "QA Verify" --roles 3
-  2. Edit each role YAML with name, runtime, model, reasoning, emoji, and instructions.
-  3. Edit prompt.md with the debate topic.
+  2. Edit riff.yaml with title, prompt, rounds, and support folders.
+  3. Edit each role YAML with name, runtime, model, reasoning, and role_prompt.
   4. Riff automatically applies ~/.riff/config/base_prompt.md when the riff runs.
   5. Publish the app-visible riff from those files.
      riffctl publish qa-verify

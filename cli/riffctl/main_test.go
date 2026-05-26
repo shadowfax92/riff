@@ -18,7 +18,8 @@ func TestHelpExplainsTemplateWorkflowForAgents(t *testing.T) {
 		"riffctl template create reusable-debate --roles 3",
 		"~/.riff/drafts/qa-verify/riff.yaml",
 		"~/.riff/drafts/qa-verify/agents/role-1.yaml",
-		"Edit prompt.md with the debate topic.",
+		"Edit riff.yaml with title, prompt, rounds, and support folders.",
+		"Edit each role YAML with name, runtime, model, reasoning, and role_prompt.",
 		"Riff automatically applies ~/.riff/config/base_prompt.md when the riff runs.",
 		"Publish the app-visible riff from those files.",
 		"Open Riff. The new riff appears in the sidebar; click Start.",
@@ -32,10 +33,9 @@ func TestHelpExplainsTemplateWorkflowForAgents(t *testing.T) {
 func TestCreateDraftAndPublishCommandsUseNewShape(t *testing.T) {
 	root := t.TempDir()
 
-	if err := run([]string{"create", "qa-verify", "--title", "QA Verify", "--roles", "2", "--root", root}); err != nil {
+	if err := run([]string{"create", "qa-verify", "--title", "QA Verify", "--prompt", "Validate the idea.", "--roles", "2", "--root", root}); err != nil {
 		t.Fatalf("create draft returned error: %v", err)
 	}
-	writeFile(t, filepath.Join(root, "drafts", "qa-verify", "prompt.md"), "Validate the idea.\n")
 
 	if err := run([]string{"publish", "qa-verify", "--root", root}); err != nil {
 		t.Fatalf("publish riff returned error: %v", err)

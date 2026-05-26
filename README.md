@@ -46,13 +46,12 @@ This creates:
 
 ```text
 ~/.riff/drafts/architecture-debate/riff.yaml
-~/.riff/drafts/architecture-debate/prompt.md
 ~/.riff/drafts/architecture-debate/agents/role-1.yaml
 ~/.riff/drafts/architecture-debate/agents/role-2.yaml
 ~/.riff/drafts/architecture-debate/agents/role-3.yaml
 ```
 
-Edit `prompt.md` with the debate topic, and edit each role YAML with the agent name, runtime, model, reasoning, emoji, and instructions. Riff automatically applies `~/.riff/config/base_prompt.md` when the riff runs. Then create the riff:
+Edit `riff.yaml` with the title, prompt, rounds, and support folders. Edit each role YAML with the agent name, runtime, model, reasoning, and `role_prompt`. Riff automatically applies `~/.riff/config/base_prompt.md` when the riff runs. Then create the riff:
 
 ```sh
 go run . publish architecture-debate

@@ -28,12 +28,11 @@ type PublishDraftOptions struct {
 }
 
 type roleYAML struct {
-	Name         string `yaml:"name"`
-	Runtime      string `yaml:"runtime"`
-	Model        string `yaml:"model"`
-	Reasoning    string `yaml:"reasoning"`
-	Emoji        string `yaml:"emoji"`
-	Instructions string `yaml:"instructions"`
+	Name       string `yaml:"name"`
+	Runtime    string `yaml:"runtime"`
+	Model      string `yaml:"model"`
+	Reasoning  string `yaml:"reasoning"`
+	RolePrompt string `yaml:"role_prompt"`
 }
 
 type agentJSON struct {
@@ -65,14 +64,14 @@ type conversationLocationJSON struct {
 
 type draftRiffYAML struct {
 	Title          string          `yaml:"title"`
-	PromptFile     string          `yaml:"prompt_file"`
+	Prompt         string          `yaml:"prompt"`
 	Rounds         int             `yaml:"rounds"`
 	SupportFolders []string        `yaml:"support_folders"`
 	Agents         []draftAgentRef `yaml:"agents"`
 }
 
 type draftAgentRef struct {
-	PromptFile string `yaml:"prompt_file"`
+	RoleFile string `yaml:"role_file"`
 }
 
 func PublishDraft(opts PublishDraftOptions) (PublishDraftResult, error) {
@@ -88,9 +87,9 @@ func PublishDraft(opts PublishDraftOptions) (PublishDraftResult, error) {
 	if err != nil {
 		return PublishDraftResult{}, err
 	}
-	prompt, err := readDraftPrompt(draftPath, draft)
-	if err != nil {
-		return PublishDraftResult{}, err
+	prompt := ensurePrompt(draft.Prompt)
+	if strings.TrimSpace(prompt) == "" {
+		return PublishDraftResult{}, fmt.Errorf("draft prompt is required in %s", filepath.Join(draftPath, "riff.yaml"))
 	}
 	agents, err := readDraftAgents(draftPath, draft.Agents)
 	if err != nil {
@@ -139,18 +138,6 @@ func readDraftRiff(draftPath string) (draftRiffYAML, error) {
 	return draft, nil
 }
 
-func readDraftPrompt(draftPath string, draft draftRiffYAML) (string, error) {
-	promptFile := strings.TrimSpace(draft.PromptFile)
-	if promptFile == "" {
-		promptFile = "prompt.md"
-	}
-	path, err := draftRelativePath(draftPath, promptFile)
-	if err != nil {
-		return "", err
-	}
-	return readPromptFile(path)
-}
-
 func readDraftAgents(draftPath string, refs []draftAgentRef) ([]agentJSON, error) {
 	files, err := draftAgentFiles(draftPath, refs)
 	if err != nil {
@@ -188,7 +175,7 @@ func draftAgentFiles(draftPath string, refs []draftAgentRef) ([]string, error) {
 	}
 	files := make([]string, 0, len(refs))
 	for _, ref := range refs {
-		path, err := draftRelativePath(draftPath, ref.PromptFile)
+		path, err := draftRelativePath(draftPath, ref.RoleFile)
 		if err != nil {
 			return nil, err
 		}
@@ -208,16 +195,11 @@ func draftRelativePath(draftPath string, relative string) (string, error) {
 	return filepath.Join(draftPath, cleaned), nil
 }
 
-func readPromptFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
+func ensurePrompt(prompt string) string {
+	if strings.TrimSpace(prompt) == "" || strings.HasSuffix(prompt, "\n") {
+		return prompt
 	}
-	prompt := string(data)
-	if strings.TrimSpace(prompt) == "" {
-		return "", fmt.Errorf("prompt file is empty: %s", path)
-	}
-	return prompt, nil
+	return prompt + "\n"
 }
 
 func agentFromRole(role roleYAML, index int, file string) (agentJSON, error) {
@@ -225,9 +207,9 @@ func agentFromRole(role roleYAML, index int, file string) (agentJSON, error) {
 	if name == "" {
 		name = "Role " + strconv.Itoa(index)
 	}
-	instructions := strings.TrimSpace(role.Instructions)
+	instructions := strings.TrimSpace(role.RolePrompt)
 	if instructions == "" {
-		return agentJSON{}, fmt.Errorf("%s: instructions are required", file)
+		return agentJSON{}, fmt.Errorf("%s: role_prompt is required", file)
 	}
 	runtime := strings.TrimSpace(role.Runtime)
 	if runtime == "" {
@@ -245,7 +227,6 @@ func agentFromRole(role roleYAML, index int, file string) (agentJSON, error) {
 		return agentJSON{}, err
 	}
 	return agentJSON{
-		Emoji:        strings.TrimSpace(role.Emoji),
 		ID:           id,
 		Instructions: instructions,
 		Model:        model,

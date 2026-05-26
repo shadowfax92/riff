@@ -46,8 +46,14 @@ func TestCreateAgentTemplateWritesRequestedRoleYAMLs(t *testing.T) {
 		if !strings.Contains(text, "runtime: claude") {
 			t.Fatalf("role file %q missing default runtime, contents:\n%s", file, text)
 		}
-		if !strings.Contains(text, "instructions: |") {
-			t.Fatalf("role file %q missing instructions block, contents:\n%s", file, text)
+		if !strings.Contains(text, "role_prompt: |") {
+			t.Fatalf("role file %q missing role_prompt block, contents:\n%s", file, text)
+		}
+		if strings.Contains(text, "emoji:") {
+			t.Fatalf("role file %q should not contain emoji, contents:\n%s", file, text)
+		}
+		if strings.Contains(text, "instructions:") {
+			t.Fatalf("role file %q should not contain instructions, contents:\n%s", file, text)
 		}
 	}
 }
