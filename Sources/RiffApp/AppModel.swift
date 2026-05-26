@@ -92,6 +92,10 @@ final class AppModel: ObservableObject {
         return PendingSteer(conversationID: selectedID, messages: messages)
     }
 
+    /// On-disk folder backing the selected conversation (~/.riff/conversations/<id>),
+    /// surfaced so the Details sheet can show and copy its full path.
+    var selectedConversationURL: URL? { selectedLocation?.url }
+
     /// Initializes local config files and loads recent/default conversations
     /// into the sidebar without overwriting user-edited configs.
     func bootstrap() async {

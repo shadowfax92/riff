@@ -22,7 +22,8 @@ struct ChatPaneView: View {
             if let conversation = model.selectedConversation {
                 ConversationDetailsSheet(
                     conversation: conversation,
-                    basePromptURL: model.basePromptURL
+                    basePromptURL: model.basePromptURL,
+                    conversationURL: model.selectedConversationURL
                 ) {
                     showingDetails = false
                 }

@@ -1,10 +1,13 @@
+import AppKit
 import RiffCore
 import SwiftUI
 
 struct ConversationDetailsSheet: View {
     let conversation: Conversation
     let basePromptURL: URL
+    let conversationURL: URL?
     let onClose: () -> Void
+    @State private var copied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -28,6 +31,7 @@ struct ConversationDetailsSheet: View {
                     }
 
                     supportFoldersSection
+                    conversationFolderRow
                     basePromptRow
                     rolesSection
                 }
@@ -116,6 +120,62 @@ struct ConversationDetailsSheet: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Shows where this conversation lives on disk and lets the user grab
+    /// the absolute path (for `cd`, scripts, etc.) or reveal it in Finder.
+    @ViewBuilder
+    private var conversationFolderRow: some View {
+        if let conversationURL {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Conversation folder")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(conversationURL.path)
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+                Spacer()
+                Button {
+                    copyPath(conversationURL)
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([conversationURL])
+                } label: {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Show in Finder")
+            }
+            .padding(12)
+            .background(Theme.Color.surfaceOverlay)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Theme.Color.surfaceStroke)
+            )
+        }
+    }
+
+    /// Copies the absolute path and shows a brief "Copied" confirmation that
+    /// reverts on its own.
+    private func copyPath(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.path, forType: .string)
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copied = false
         }
     }
 
