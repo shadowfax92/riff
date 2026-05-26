@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct RiffApp: App {
     @StateObject private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("riff.appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
 
     var body: some Scene {
@@ -10,6 +11,12 @@ struct RiffApp: App {
             RootView()
                 .environmentObject(model)
                 .task { await model.bootstrap() }
+                .onChange(of: scenePhase) {
+                    guard scenePhase == .active else {
+                        return
+                    }
+                    Task { await model.refreshRowsFromDisk() }
+                }
                 .frame(minWidth: 1100, minHeight: 700)
                 .preferredColorScheme(appearance.colorScheme)
         }
