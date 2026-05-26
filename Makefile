@@ -9,6 +9,10 @@ INSTALL_DIR ?= /Applications
 MIN_MACOS := 15.0
 SHORT_VERSION := 0.1.0
 BIN_PATH := .build/$(CONFIG)/$(APP_NAME)
+CLI_NAME := riffctl
+CLI_DIR := cli/riffctl
+CLI_BIN_PATH := $(CLI_DIR)/$(CLI_NAME)
+GOBIN ?= $(shell go env GOPATH)/bin
 SHELL := /bin/bash
 
 DMG_PATH := $(APP_NAME)-$(SHORT_VERSION).dmg
@@ -17,7 +21,7 @@ INSTALL_APP := $(INSTALL_DIR)/$(APP_BUNDLE)
 INSTALL_STAGING_DIR := .build/install-staging
 INSTALL_STAGING_APP := $(INSTALL_STAGING_DIR)/$(APP_BUNDLE)
 
-.PHONY: all build app icon install reinstall uninstall open dmg test clean
+.PHONY: all build app icon install install-cli reinstall uninstall open dmg test clean
 
 all: build
 
@@ -93,6 +97,15 @@ install: app
 	echo "✓ Installed $(INSTALL_APP)"; \
 	echo "  open \"$(INSTALL_APP)\""
 
+install-cli:
+	@set -euo pipefail; \
+	echo "→ building $(CLI_NAME)"; \
+	(cd "$(CLI_DIR)" && go build -o "$(CLI_NAME)" .); \
+	mkdir -p "$(GOBIN)"; \
+	cp "$(CLI_BIN_PATH)" "$(GOBIN)/$(CLI_NAME)"; \
+	codesign --force --sign - "$(GOBIN)/$(CLI_NAME)" >/dev/null; \
+	echo "✓ Installed $(CLI_NAME) to $(GOBIN)/$(CLI_NAME)"
+
 reinstall:
 	@rm -rf "$(INSTALL_APP)"
 	@$(MAKE) install INSTALL_DIR="$(INSTALL_DIR)" CONFIG="$(CONFIG)"
@@ -124,4 +137,4 @@ test:
 	swift test
 
 clean:
-	rm -rf .build "$(APP_BUNDLE)" "$(APP_NAME)"-*.dmg
+	rm -rf .build "$(APP_BUNDLE)" "$(APP_NAME)"-*.dmg "$(CLI_BIN_PATH)"

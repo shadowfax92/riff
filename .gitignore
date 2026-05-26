@@ -6,4 +6,5 @@ DerivedData/
 *.xcuserstate
 Riff.app/
 Riff-*.dmg
+cli/riffctl/riffctl
 .DS_Store
