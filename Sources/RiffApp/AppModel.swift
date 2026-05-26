@@ -118,6 +118,7 @@ final class AppModel: ObservableObject {
     func refreshRowsFromDisk() async {
         do {
             let preferredID = selectedID
+            try configStore.bootstrap()
             try reloadRows()
             await selectRowAfterReload(preferredID: preferredID)
         } catch {

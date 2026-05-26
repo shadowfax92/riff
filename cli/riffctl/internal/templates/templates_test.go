@@ -3,6 +3,7 @@ package templates
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -31,7 +32,7 @@ func TestCreateAgentTemplateWritesRequestedRoleYAMLs(t *testing.T) {
 			t.Fatalf("read role file %q: %v", file, err)
 		}
 		text := string(data)
-		if !strings.Contains(text, "name: Role "+string(rune('1'+i))) {
+		if !strings.Contains(text, "name: Role "+strconv.Itoa(i+1)) {
 			t.Fatalf("role file %q missing default role name, contents:\n%s", file, text)
 		}
 		if !strings.Contains(text, "runtime: claude") {
