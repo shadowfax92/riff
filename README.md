@@ -35,29 +35,36 @@ open ~/Applications/Riff.app
 
 ## CLI
 
-`riffctl` is a small Go helper for creating role template files under `~/.riff/templates`, then turning those files into an app-visible riff under `~/.riff/conversations`.
+`riffctl` is a small Go helper for creating editable riff draft files under `~/.riff/drafts`, then publishing those files into an app-visible riff under `~/.riff/conversations`.
 
 ```sh
 cd cli/riffctl
-go run . create template architecture-debate --roles 3
+go run . create architecture-debate --title "Architecture debate" --roles 3
 ```
 
 This creates:
 
 ```text
-~/.riff/templates/architecture-debate/prompt.md
-~/.riff/templates/architecture-debate/role-1.yaml
-~/.riff/templates/architecture-debate/role-2.yaml
-~/.riff/templates/architecture-debate/role-3.yaml
+~/.riff/drafts/architecture-debate/riff.yaml
+~/.riff/drafts/architecture-debate/prompt.md
+~/.riff/drafts/architecture-debate/agents/role-1.yaml
+~/.riff/drafts/architecture-debate/agents/role-2.yaml
+~/.riff/drafts/architecture-debate/agents/role-3.yaml
 ```
 
 Edit `prompt.md` with the debate topic, and edit each role YAML with the agent name, runtime, model, reasoning, emoji, and instructions. Riff automatically applies `~/.riff/config/base_prompt.md` when the riff runs. Then create the riff:
 
 ```sh
-go run . create architecture-debate --title "Architecture debate"
+go run . publish architecture-debate
 ```
 
 This writes a real idle conversation to `~/.riff/conversations/<id>/`. Open Riff and the new riff appears in the sidebar; click **Start** to run it.
+
+Reusable templates are separate:
+
+```sh
+go run . template create reusable-debate --roles 3
+```
 
 ## How it works
 

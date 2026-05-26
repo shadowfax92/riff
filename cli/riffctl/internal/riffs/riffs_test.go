@@ -10,11 +10,21 @@ import (
 
 func TestCreateRiffFromTemplateWritesAppConversationLayout(t *testing.T) {
 	root := t.TempDir()
-	templatePath := filepath.Join(root, "templates", "architecture-debate")
-	if err := os.MkdirAll(templatePath, 0755); err != nil {
-		t.Fatalf("create template dir: %v", err)
+	draftPath := filepath.Join(root, "drafts", "architecture-debate")
+	if err := os.MkdirAll(filepath.Join(draftPath, "agents"), 0755); err != nil {
+		t.Fatalf("create draft dir: %v", err)
 	}
-	writeFile(t, filepath.Join(templatePath, "role-1.yaml"), `name: Critic
+	writeFile(t, filepath.Join(draftPath, "riff.yaml"), `title: Architecture debate
+prompt_file: prompt.md
+rounds: 10
+support_folders:
+  - ~/Workspaces/research
+agents:
+  - prompt_file: agents/role-1.yaml
+  - prompt_file: agents/role-2.yaml
+`)
+	writeFile(t, filepath.Join(draftPath, "prompt.md"), "Should we build the CLI?\n")
+	writeFile(t, filepath.Join(draftPath, "agents", "role-1.yaml"), `name: Critic
 runtime: claude
 model: default
 reasoning: ""
@@ -22,7 +32,7 @@ emoji: C
 instructions: |
   Find the weakest assumption.
 `)
-	writeFile(t, filepath.Join(templatePath, "role-2.yaml"), `name: Researcher
+	writeFile(t, filepath.Join(draftPath, "agents", "role-2.yaml"), `name: Researcher
 runtime: codex
 model: gpt-5.1
 reasoning: high
@@ -30,21 +40,10 @@ emoji: R
 instructions: |
   Bring evidence and citations.
 `)
-	promptPath := filepath.Join(t.TempDir(), "prompt.md")
-	writeFile(t, promptPath, "Should we build the CLI?\n")
 
-	result, err := CreateRiff(CreateRiffOptions{
-		Root:       root,
-		Template:   "architecture-debate",
-		Title:      "Architecture debate",
-		PromptFile: promptPath,
-		Rounds:     10,
-		SupportFolders: []string{
-			"~/Workspaces/research",
-		},
-	})
+	result, err := PublishDraft(PublishDraftOptions{Root: root, Name: "architecture-debate"})
 	if err != nil {
-		t.Fatalf("CreateRiff returned error: %v", err)
+		t.Fatalf("PublishDraft returned error: %v", err)
 	}
 
 	conversationPath := filepath.Join(result.Path, "conversation.json")
@@ -94,26 +93,26 @@ instructions: |
 
 func TestCreateRiffDefaultsToTemplatePromptFile(t *testing.T) {
 	root := t.TempDir()
-	templatePath := filepath.Join(root, "templates", "default-prompt")
-	if err := os.MkdirAll(templatePath, 0755); err != nil {
-		t.Fatalf("create template dir: %v", err)
+	draftPath := filepath.Join(root, "drafts", "default-prompt")
+	if err := os.MkdirAll(filepath.Join(draftPath, "agents"), 0755); err != nil {
+		t.Fatalf("create draft dir: %v", err)
 	}
-	writeFile(t, filepath.Join(templatePath, "role-1.yaml"), `name: Critic
+	writeFile(t, filepath.Join(draftPath, "riff.yaml"), `title: Default prompt
+rounds: 1
+agents:
+  - prompt_file: agents/role-1.yaml
+`)
+	writeFile(t, filepath.Join(draftPath, "prompt.md"), "Use the draft prompt by default.\n")
+	writeFile(t, filepath.Join(draftPath, "agents", "role-1.yaml"), `name: Critic
 runtime: claude
 model: default
 instructions: |
   Argue clearly.
 `)
-	writeFile(t, filepath.Join(templatePath, "prompt.md"), "Use the template prompt by default.\n")
 
-	result, err := CreateRiff(CreateRiffOptions{
-		Root:     root,
-		Template: "default-prompt",
-		Title:    "Default prompt",
-		Rounds:   1,
-	})
+	result, err := PublishDraft(PublishDraftOptions{Root: root, Name: "default-prompt"})
 	if err != nil {
-		t.Fatalf("CreateRiff returned error: %v", err)
+		t.Fatalf("PublishDraft returned error: %v", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(result.Path, "conversation.json"))
@@ -124,7 +123,7 @@ instructions: |
 	if err := json.Unmarshal(data, &conversation); err != nil {
 		t.Fatalf("decode conversation.json: %v", err)
 	}
-	if conversation.Prompt != "Use the template prompt by default.\n" {
+	if conversation.Prompt != "Use the draft prompt by default.\n" {
 		t.Fatalf("prompt = %q", conversation.Prompt)
 	}
 }

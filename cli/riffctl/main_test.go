@@ -13,14 +13,14 @@ func TestHelpExplainsTemplateWorkflowForAgents(t *testing.T) {
 	output := captureStdout(t, printUsage)
 
 	for _, want := range []string{
-		"riffctl create template architecture-debate --roles 3",
-		"riffctl create architecture-debate --title \"Architecture debate\"",
-		"~/.riff/templates/architecture-debate/role-1.yaml",
-		"~/.riff/templates/architecture-debate/prompt.md",
-		"Edit each role YAML",
+		"riffctl create qa-verify --title \"QA Verify\" --roles 3",
+		"riffctl publish qa-verify",
+		"riffctl template create reusable-debate --roles 3",
+		"~/.riff/drafts/qa-verify/riff.yaml",
+		"~/.riff/drafts/qa-verify/agents/role-1.yaml",
 		"Edit prompt.md with the debate topic.",
 		"Riff automatically applies ~/.riff/config/base_prompt.md when the riff runs.",
-		"Create the app-visible riff from those files.",
+		"Publish the app-visible riff from those files.",
 		"Open Riff. The new riff appears in the sidebar; click Start.",
 	} {
 		if !strings.Contains(output, want) {
@@ -29,18 +29,18 @@ func TestHelpExplainsTemplateWorkflowForAgents(t *testing.T) {
 	}
 }
 
-func TestCreateTemplateAndCreateRiffCommandsUseNewShape(t *testing.T) {
+func TestCreateDraftAndPublishCommandsUseNewShape(t *testing.T) {
 	root := t.TempDir()
 
-	if err := run([]string{"create", "template", "qa-verify", "--roles", "2", "--root", root}); err != nil {
-		t.Fatalf("create template returned error: %v", err)
+	if err := run([]string{"create", "qa-verify", "--title", "QA Verify", "--roles", "2", "--root", root}); err != nil {
+		t.Fatalf("create draft returned error: %v", err)
 	}
-	writeFile(t, filepath.Join(root, "templates", "qa-verify", "prompt.md"), "Validate the idea.\n")
+	writeFile(t, filepath.Join(root, "drafts", "qa-verify", "prompt.md"), "Validate the idea.\n")
 
-	if err := run([]string{"create", "qa-verify", "--title", "QA Verify", "--root", root}); err != nil {
-		t.Fatalf("create riff returned error: %v", err)
+	if err := run([]string{"publish", "qa-verify", "--root", root}); err != nil {
+		t.Fatalf("publish riff returned error: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "templates", "qa-verify", "role-1.yaml")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "drafts", "qa-verify", "agents", "role-1.yaml")); err != nil {
 		t.Fatalf("role file missing: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "config", "recent-conversations.json")); err != nil {
@@ -48,7 +48,18 @@ func TestCreateTemplateAndCreateRiffCommandsUseNewShape(t *testing.T) {
 	}
 }
 
-func TestOldCreateAgentAndCreateRiffFormsAreRejected(t *testing.T) {
+func TestTemplateCreateUsesSeparatePath(t *testing.T) {
+	root := t.TempDir()
+
+	if err := run([]string{"template", "create", "reusable-debate", "--roles", "2", "--root", root}); err != nil {
+		t.Fatalf("template create returned error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "templates", "reusable-debate", "role-1.yaml")); err != nil {
+		t.Fatalf("template role file missing: %v", err)
+	}
+}
+
+func TestOldCreateAgentCreateRiffAndCreateTemplateFormsAreRejected(t *testing.T) {
 	root := t.TempDir()
 
 	if err := run([]string{"create", "agent", "qa-verify", "--roles", "2", "--root", root}); err == nil {
@@ -56,6 +67,9 @@ func TestOldCreateAgentAndCreateRiffFormsAreRejected(t *testing.T) {
 	}
 	if err := run([]string{"create", "riff", "qa-verify", "--title", "QA Verify", "--root", root}); err == nil {
 		t.Fatal("create riff unexpectedly succeeded")
+	}
+	if err := run([]string{"create", "template", "qa-verify", "--roles", "2", "--root", root}); err == nil {
+		t.Fatal("create template unexpectedly succeeded")
 	}
 }
 

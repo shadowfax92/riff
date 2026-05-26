@@ -32,6 +32,11 @@ type CreateRiffResult struct {
 	Path string
 }
 
+type PublishDraftOptions struct {
+	Root string
+	Name string
+}
+
 type roleYAML struct {
 	Name         string `yaml:"name"`
 	Runtime      string `yaml:"runtime"`
@@ -66,6 +71,151 @@ type conversationJSON struct {
 type conversationLocationJSON struct {
 	ID  string `json:"id"`
 	URL string `json:"url"`
+}
+
+type draftRiffYAML struct {
+	Title          string          `yaml:"title"`
+	PromptFile     string          `yaml:"prompt_file"`
+	Rounds         int             `yaml:"rounds"`
+	SupportFolders []string        `yaml:"support_folders"`
+	Agents         []draftAgentRef `yaml:"agents"`
+}
+
+type draftAgentRef struct {
+	PromptFile string `yaml:"prompt_file"`
+}
+
+func PublishDraft(opts PublishDraftOptions) (CreateRiffResult, error) {
+	root, err := rootPath(opts.Root)
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	draftPath, err := resolveDraftPath(root, opts.Name)
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	draft, err := readDraftRiff(draftPath)
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	prompt, err := readDraftPrompt(draftPath, draft)
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	agents, err := readDraftAgents(draftPath, draft.Agents)
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	if len(agents) == 0 {
+		return CreateRiffResult{}, fmt.Errorf("draft has no agent YAML files: %s", draftPath)
+	}
+	conversationID, err := newUUID()
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	supportFolders, err := fileURLs(draft.SupportFolders)
+	if err != nil {
+		return CreateRiffResult{}, err
+	}
+	conversationPath := filepath.Join(root, "conversations", conversationID)
+	conversation := conversationJSON{
+		Agents:         agents,
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
+		ID:             conversationID,
+		MaxRounds:      roundsOrDefault(draft.Rounds),
+		Prompt:         prompt,
+		Status:         "idle",
+		SupportFolders: supportFolders,
+		Title:          titleOrDefault(draft.Title, opts.Name),
+	}
+	if err := writeConversation(conversationPath, conversation); err != nil {
+		return CreateRiffResult{}, err
+	}
+	if err := rememberConversation(root, conversationID, conversationPath); err != nil {
+		return CreateRiffResult{}, err
+	}
+	return CreateRiffResult{ID: conversationID, Path: conversationPath}, nil
+}
+
+func readDraftRiff(draftPath string) (draftRiffYAML, error) {
+	data, err := os.ReadFile(filepath.Join(draftPath, "riff.yaml"))
+	if err != nil {
+		return draftRiffYAML{}, err
+	}
+	var draft draftRiffYAML
+	if err := yaml.Unmarshal(data, &draft); err != nil {
+		return draftRiffYAML{}, err
+	}
+	return draft, nil
+}
+
+func readDraftPrompt(draftPath string, draft draftRiffYAML) (string, error) {
+	promptFile := strings.TrimSpace(draft.PromptFile)
+	if promptFile == "" {
+		promptFile = "prompt.md"
+	}
+	path, err := draftRelativePath(draftPath, promptFile)
+	if err != nil {
+		return "", err
+	}
+	return readPromptFile(path)
+}
+
+func readDraftAgents(draftPath string, refs []draftAgentRef) ([]agentJSON, error) {
+	files, err := draftAgentFiles(draftPath, refs)
+	if err != nil {
+		return nil, err
+	}
+	agents := make([]agentJSON, 0, len(files))
+	for i, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		var role roleYAML
+		if err := yaml.Unmarshal(data, &role); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", file, err)
+		}
+		agent, err := agentFromRole(role, i+1, file)
+		if err != nil {
+			return nil, err
+		}
+		agents = append(agents, agent)
+	}
+	return agents, nil
+}
+
+func draftAgentFiles(draftPath string, refs []draftAgentRef) ([]string, error) {
+	if len(refs) == 0 {
+		files, err := filepath.Glob(filepath.Join(draftPath, "agents", "role-*.yaml"))
+		if err != nil {
+			return nil, err
+		}
+		sort.Slice(files, func(i, j int) bool {
+			return roleFileIndex(files[i]) < roleFileIndex(files[j])
+		})
+		return files, nil
+	}
+	files := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		path, err := draftRelativePath(draftPath, ref.PromptFile)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, path)
+	}
+	return files, nil
+}
+
+func draftRelativePath(draftPath string, relative string) (string, error) {
+	cleaned := filepath.Clean(strings.TrimSpace(relative))
+	if cleaned == "." || cleaned == "" {
+		return "", errors.New("draft file path is required")
+	}
+	if filepath.IsAbs(cleaned) || strings.HasPrefix(cleaned, "..") {
+		return "", fmt.Errorf("invalid draft-relative path: %s", relative)
+	}
+	return filepath.Join(draftPath, cleaned), nil
 }
 
 func CreateRiff(opts CreateRiffOptions) (CreateRiffResult, error) {
@@ -283,6 +433,28 @@ func resolveTemplatePath(root string, template string) (string, error) {
 		}
 	}
 	path := filepath.Join(root, "templates", slug(template))
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return path, nil
+	} else if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func resolveDraftPath(root string, draft string) (string, error) {
+	draft = strings.TrimSpace(draft)
+	if draft == "" {
+		return "", errors.New("draft name or path is required")
+	}
+	expanded := expandHome(draft)
+	if filepath.IsAbs(expanded) || strings.HasPrefix(draft, ".") {
+		if info, err := os.Stat(expanded); err == nil && info.IsDir() {
+			return expanded, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+	path := filepath.Join(root, "drafts", slug(draft))
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
 		return path, nil
 	} else if err != nil {
