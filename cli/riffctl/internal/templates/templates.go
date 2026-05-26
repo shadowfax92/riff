@@ -19,6 +19,7 @@ type CreateAgentOptions struct {
 
 type CreateAgentResult struct {
 	Path      string
+	Prompt    string
 	RoleFiles []string
 }
 
@@ -46,11 +47,15 @@ func CreateAgentTemplate(opts CreateAgentOptions) (CreateAgentResult, error) {
 	if err := prepareTemplateDirectory(templatePath, opts.Force); err != nil {
 		return CreateAgentResult{}, err
 	}
+	promptPath, err := writePromptFile(templatePath)
+	if err != nil {
+		return CreateAgentResult{}, err
+	}
 	files, err := writeRoleFiles(templatePath, opts.Roles)
 	if err != nil {
 		return CreateAgentResult{}, err
 	}
-	return CreateAgentResult{Path: templatePath, RoleFiles: files}, nil
+	return CreateAgentResult{Path: templatePath, Prompt: promptPath, RoleFiles: files}, nil
 }
 
 func validateOptions(opts CreateAgentOptions) error {
@@ -77,6 +82,14 @@ func prepareTemplateDirectory(path string, force bool) error {
 	return os.MkdirAll(path, 0755)
 }
 
+func writePromptFile(templatePath string) (string, error) {
+	path := filepath.Join(templatePath, "prompt.md")
+	if err := os.WriteFile(path, []byte(defaultPromptMarkdown()), 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 func writeRoleFiles(templatePath string, roles int) ([]string, error) {
 	files := make([]string, 0, roles)
 	for i := 1; i <= roles; i++ {
@@ -99,6 +112,14 @@ emoji: ""
 instructions: |
   Make a sharp case for...
 `, roleName)
+}
+
+func defaultPromptMarkdown() string {
+	return `What should the agents debate?
+
+Replace this with the specific question or topic for this riff.
+Riff will also apply ~/.riff/config/base_prompt.md automatically when the riff runs.
+`
 }
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)

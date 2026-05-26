@@ -23,6 +23,14 @@ func TestCreateAgentTemplateWritesRequestedRoleYAMLs(t *testing.T) {
 	if result.Path != filepath.Join(root, "templates", "strategy-debate") {
 		t.Fatalf("template path = %q, want template under ~/.riff/templates", result.Path)
 	}
+	promptPath := filepath.Join(result.Path, "prompt.md")
+	prompt, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("read prompt file %q: %v", promptPath, err)
+	}
+	if !strings.Contains(string(prompt), "What should the agents debate?") {
+		t.Fatalf("prompt file missing debate prompt placeholder, contents:\n%s", string(prompt))
+	}
 	if len(result.RoleFiles) != 3 {
 		t.Fatalf("created %d role files, want 3", len(result.RoleFiles))
 	}

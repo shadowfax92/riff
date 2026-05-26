@@ -41,6 +41,7 @@ func createAgent(args []string) error {
 		return err
 	}
 	fmt.Printf("Created agent template: %s\n", result.Path)
+	fmt.Printf("  %s\n", result.Prompt)
 	for _, file := range result.RoleFiles {
 		fmt.Printf("  %s\n", file)
 	}
@@ -173,14 +174,15 @@ func printUsage() {
 
 Usage:
   riffctl create agent <name> [roles] [--roles N] [--root PATH] [--force]
-  riffctl create riff <template> --title TITLE (--prompt TEXT | --prompt-file PATH) [--rounds N] [--support-folder PATH] [--root PATH]
+  riffctl create riff <template> --title TITLE [--prompt TEXT | --prompt-file PATH] [--rounds N] [--support-folder PATH] [--root PATH]
 
 Examples:
   riffctl create agent architecture-debate --roles 3
   riffctl create agent architecture-debate 3
-  riffctl create riff architecture-debate --title "Architecture debate" --prompt-file ./prompt.md
+  riffctl create riff architecture-debate --title "Architecture debate"
 
 Output:
+  ~/.riff/templates/architecture-debate/prompt.md
   ~/.riff/templates/architecture-debate/role-1.yaml
   ~/.riff/templates/architecture-debate/role-2.yaml
   ~/.riff/templates/architecture-debate/role-3.yaml
@@ -189,7 +191,9 @@ Output:
 Workflow for another AI agent:
   1. Run: riffctl create agent architecture-debate --roles 3
   2. Edit each role YAML with name, runtime, model, reasoning, emoji, and instructions.
-  3. Create the app-visible riff from those files.
-     riffctl create riff architecture-debate --title "Architecture debate" --prompt-file ./prompt.md
-  4. Open Riff. The new riff appears in the sidebar; click Start.`)
+  3. Edit prompt.md with the debate topic.
+  4. Riff automatically applies ~/.riff/config/base_prompt.md when the riff runs.
+  5. Create the app-visible riff from those files.
+     riffctl create riff architecture-debate --title "Architecture debate"
+  6. Open Riff. The new riff appears in the sidebar; click Start.`)
 }

@@ -45,15 +45,16 @@ go run . create agent architecture-debate --roles 3
 This creates:
 
 ```text
+~/.riff/templates/architecture-debate/prompt.md
 ~/.riff/templates/architecture-debate/role-1.yaml
 ~/.riff/templates/architecture-debate/role-2.yaml
 ~/.riff/templates/architecture-debate/role-3.yaml
 ```
 
-Edit each role YAML with the agent name, runtime, model, reasoning, emoji, and instructions. Then create the riff:
+Edit `prompt.md` with the debate topic, and edit each role YAML with the agent name, runtime, model, reasoning, emoji, and instructions. Riff automatically applies `~/.riff/config/base_prompt.md` when the riff runs. Then create the riff:
 
 ```sh
-go run . create riff architecture-debate --title "Architecture debate" --prompt-file ./prompt.md
+go run . create riff architecture-debate --title "Architecture debate"
 ```
 
 This writes a real idle conversation to `~/.riff/conversations/<id>/`. Open Riff and the new riff appears in the sidebar; click **Start** to run it.

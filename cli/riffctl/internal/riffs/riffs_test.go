@@ -92,9 +92,9 @@ instructions: |
 	}
 }
 
-func TestCreateRiffRequiresPrompt(t *testing.T) {
+func TestCreateRiffDefaultsToTemplatePromptFile(t *testing.T) {
 	root := t.TempDir()
-	templatePath := filepath.Join(root, "templates", "empty-prompt")
+	templatePath := filepath.Join(root, "templates", "default-prompt")
 	if err := os.MkdirAll(templatePath, 0755); err != nil {
 		t.Fatalf("create template dir: %v", err)
 	}
@@ -104,15 +104,28 @@ model: default
 instructions: |
   Argue clearly.
 `)
+	writeFile(t, filepath.Join(templatePath, "prompt.md"), "Use the template prompt by default.\n")
 
-	_, err := CreateRiff(CreateRiffOptions{
+	result, err := CreateRiff(CreateRiffOptions{
 		Root:     root,
-		Template: "empty-prompt",
-		Title:    "Empty prompt",
+		Template: "default-prompt",
+		Title:    "Default prompt",
 		Rounds:   1,
 	})
-	if err == nil {
-		t.Fatal("CreateRiff returned nil error without prompt")
+	if err != nil {
+		t.Fatalf("CreateRiff returned error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(result.Path, "conversation.json"))
+	if err != nil {
+		t.Fatalf("read conversation.json: %v", err)
+	}
+	var conversation conversationJSON
+	if err := json.Unmarshal(data, &conversation); err != nil {
+		t.Fatalf("decode conversation.json: %v", err)
+	}
+	if conversation.Prompt != "Use the template prompt by default.\n" {
+		t.Fatalf("prompt = %q", conversation.Prompt)
 	}
 }
 

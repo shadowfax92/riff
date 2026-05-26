@@ -13,9 +13,12 @@ func TestHelpExplainsTemplateWorkflowForAgents(t *testing.T) {
 
 	for _, want := range []string{
 		"riffctl create agent architecture-debate --roles 3",
-		"riffctl create riff architecture-debate --title \"Architecture debate\" --prompt-file ./prompt.md",
+		"riffctl create riff architecture-debate --title \"Architecture debate\"",
 		"~/.riff/templates/architecture-debate/role-1.yaml",
+		"~/.riff/templates/architecture-debate/prompt.md",
 		"Edit each role YAML",
+		"Edit prompt.md with the debate topic.",
+		"Riff automatically applies ~/.riff/config/base_prompt.md when the riff runs.",
 		"Create the app-visible riff from those files.",
 		"Open Riff. The new riff appears in the sidebar; click Start.",
 	} {

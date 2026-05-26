@@ -77,7 +77,7 @@ func CreateRiff(opts CreateRiffOptions) (CreateRiffResult, error) {
 	if err != nil {
 		return CreateRiffResult{}, err
 	}
-	prompt, err := readPrompt(opts)
+	prompt, err := readPrompt(opts, templatePath)
 	if err != nil {
 		return CreateRiffResult{}, err
 	}
@@ -116,25 +116,35 @@ func CreateRiff(opts CreateRiffOptions) (CreateRiffResult, error) {
 	return CreateRiffResult{ID: conversationID, Path: conversationPath}, nil
 }
 
-func readPrompt(opts CreateRiffOptions) (string, error) {
+func readPrompt(opts CreateRiffOptions, templatePath string) (string, error) {
 	if strings.TrimSpace(opts.Prompt) != "" && strings.TrimSpace(opts.PromptFile) != "" {
 		return "", errors.New("use --prompt or --prompt-file, not both")
 	}
 	if strings.TrimSpace(opts.PromptFile) != "" {
-		data, err := os.ReadFile(expandHome(opts.PromptFile))
-		if err != nil {
-			return "", err
-		}
-		prompt := string(data)
-		if strings.TrimSpace(prompt) == "" {
-			return "", errors.New("prompt file is empty")
-		}
-		return prompt, nil
+		return readPromptFile(expandHome(opts.PromptFile))
 	}
 	if strings.TrimSpace(opts.Prompt) == "" {
-		return "", errors.New("prompt is required; pass --prompt or --prompt-file")
+		promptPath := filepath.Join(templatePath, "prompt.md")
+		if _, err := os.Stat(promptPath); err == nil {
+			return readPromptFile(promptPath)
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		return "", errors.New("prompt is required; edit template prompt.md or pass --prompt/--prompt-file")
 	}
 	return opts.Prompt, nil
+}
+
+func readPromptFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	prompt := string(data)
+	if strings.TrimSpace(prompt) == "" {
+		return "", fmt.Errorf("prompt file is empty: %s", path)
+	}
+	return prompt, nil
 }
 
 func readAgents(templatePath string) ([]agentJSON, error) {
