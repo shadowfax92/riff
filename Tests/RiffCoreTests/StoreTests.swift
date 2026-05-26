@@ -123,6 +123,53 @@ import Testing
     ])
 }
 
+@Test func creatingConversationPersistsDetailsForDetailsSheet() throws {
+    let root = try temporaryDirectory().appending(path: "conversation", directoryHint: .isDirectory)
+    let store = ConversationStore(rootURL: root)
+    let conversation = Conversation(
+        id: "details-chat",
+        title: "Architecture debate",
+        prompt: "Should agents debate architecture?",
+        createdAt: Date(timeIntervalSince1970: 10),
+        maxRounds: 8,
+        agents: [
+            AgentProfile(
+                id: "cat",
+                name: "Cat",
+                role: "Cat",
+                runtime: .claude,
+                model: "default",
+                reasoning: nil,
+                instructions: "Make a sharp case for small pieces.",
+                emoji: "C"
+            ),
+            AgentProfile(
+                id: "dog",
+                name: "Dog",
+                role: "Dog",
+                runtime: .codex,
+                model: "gpt-5",
+                reasoning: "high",
+                instructions: "Make a sharp case for integrated systems.",
+                emoji: "D"
+            ),
+        ],
+        supportFolders: [
+            URL(fileURLWithPath: "/Users/me/research"),
+            URL(fileURLWithPath: "/Users/me/notes"),
+        ]
+    )
+
+    try store.create(conversation)
+    let saved = try store.readConversation()
+
+    #expect(saved.title == "Architecture debate")
+    #expect(saved.prompt == "Should agents debate architecture?")
+    #expect(saved.maxRounds == 8)
+    #expect(saved.supportFolders.map(\.path) == ["/Users/me/research", "/Users/me/notes"])
+    #expect(saved.agents == conversation.agents)
+}
+
 @Test func conversationDecodesLegacyJSONWithoutSupportFolders() throws {
     let data = Data("""
     {
