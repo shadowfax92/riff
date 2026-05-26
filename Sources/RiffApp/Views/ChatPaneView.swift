@@ -6,6 +6,7 @@ struct ChatPaneView: View {
     @EnvironmentObject private var model: AppModel
     @State private var draft = ""
     @State private var lastTranscriptCount = 0
+    @State private var showingDetails = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,6 +17,16 @@ struct ChatPaneView: View {
         }
         .background(Theme.Color.chatBackground)
         .navigationSplitViewColumnWidth(min: 520, ideal: 720)
+        .sheet(isPresented: $showingDetails) {
+            if let conversation = model.selectedConversation {
+                ConversationDetailsSheet(
+                    conversation: conversation,
+                    basePromptURL: model.basePromptURL
+                ) {
+                    showingDetails = false
+                }
+            }
+        }
     }
 
     private var header: some View {
@@ -72,6 +83,16 @@ struct ChatPaneView: View {
                 .controlSize(.small)
                 .disabled(model.selectedConversation == nil || model.isSelectedConversationSummarizing)
             }
+
+            Button {
+                showingDetails = true
+            } label: {
+                Label("Details", systemImage: "info.circle")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(model.selectedConversation == nil)
 
             Button {
                 model.summarizeSelectedConversation()
