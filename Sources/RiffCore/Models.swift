@@ -46,6 +46,8 @@ public struct AgentProfile: Codable, Equatable, Identifiable, Sendable {
 
 public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
     public var id: String
+    /// User-facing agent display name. The stored key remains `roleName`
+    /// for compatibility with older draft encoding and call sites.
     public var roleName: String
     public var rolePrompt: String
     public var runtime: RuntimeID
@@ -85,6 +87,11 @@ public struct RoleDraft: Codable, Equatable, Identifiable, Sendable {
             reasoning: agent.reasoning,
             emoji: agent.emoji
         )
+    }
+
+    public var agentName: String {
+        get { roleName }
+        set { roleName = newValue }
     }
 
     public var isValid: Bool {

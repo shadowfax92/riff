@@ -92,3 +92,19 @@ import Testing
 
     #expect(!draft.isValid)
 }
+
+@Test func roleDraftAgentNameAliasPersistsEditedNameToAgentProfile() {
+    var draft = RoleDraft(
+        id: "role-1",
+        roleName: "Default",
+        rolePrompt: "Pressure-test the threat model.",
+        runtime: .claude
+    )
+
+    draft.agentName = "Custom Analyst"
+    let agent = draft.agentProfile(index: 1)
+
+    #expect(draft.roleName == "Custom Analyst")
+    #expect(agent.name == "Custom Analyst")
+    #expect(agent.role == "Custom Analyst")
+}
