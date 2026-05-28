@@ -318,6 +318,56 @@ final class AppModel: ObservableObject {
         )
     }
 
+    /// Saves updated per-agent runtime settings from Details, then continues
+    /// the same conversation using the normal Resume semantics.
+    @discardableResult
+    func continueSelectedConversation(roleDrafts: [RoleDraft]) async -> Bool {
+        guard let location = selectedLocation else {
+            errorMessage = "Select a Riff before continuing."
+            return false
+        }
+        guard !runRegistry.isRunning(conversationID: location.id) else {
+            errorMessage = "Stop this Riff before changing agent settings."
+            return false
+        }
+        guard !roleDrafts.isEmpty else {
+            errorMessage = "Add at least one agent before continuing."
+            return false
+        }
+
+        let agents = roleDrafts
+            .enumerated()
+            .map { offset, draft in draft.agentProfile(index: offset + 1) }
+        let missingRuntimes = RuntimeRequirement.missingRuntimes(
+            agents: agents,
+            detectedRuntimes: detectedRuntimes
+        )
+        guard missingRuntimes.isEmpty else {
+            errorMessage = RuntimeRequirement.settingsMessage(for: missingRuntimes, action: "continuing this Riff")
+            return false
+        }
+
+        do {
+            let store = ConversationStore(rootURL: location.url)
+            try store.updateAgents(agents)
+            reloadConversationFromDiskIfSelected(location)
+            try reloadRows()
+            let runConfiguration = runConfiguration(
+                for: location,
+                completedLimit: .unbounded
+            )
+            startConversation(
+                at: location,
+                limit: runConfiguration.limit,
+                automaticallySummarizeOnCompletion: runConfiguration.automaticallySummarizeOnCompletion
+            )
+            return true
+        } catch {
+            errorMessage = String(describing: error)
+            return false
+        }
+    }
+
     func removeSelectedSummary() {
         guard let selectedID, let location = selectedLocation else {
             return

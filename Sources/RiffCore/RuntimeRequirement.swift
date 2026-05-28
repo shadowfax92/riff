@@ -20,12 +20,12 @@ public enum RuntimeRequirement {
     }
 
     /// Builds the user-facing setup message shown before creating a debate.
-    public static func settingsMessage(for missingRuntimes: [RuntimeID]) -> String? {
+    public static func settingsMessage(for missingRuntimes: [RuntimeID], action: String = "creating a Riff") -> String? {
         guard !missingRuntimes.isEmpty else {
             return nil
         }
         let names = missingRuntimes.map { $0.rawValue.capitalized }.joined(separator: " and ")
-        return "\(names) unavailable. Set the missing executable path in Settings before creating a Riff."
+        return "\(names) unavailable. Set the missing executable path in Settings before \(action)."
     }
 
     private static func missingRuntimes(

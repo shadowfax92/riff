@@ -82,6 +82,38 @@ import Testing
     #expect(await adapter.requests.count == 3)
 }
 
+@Test func continuingAfterAgentModelUpdateUsesFreshSessionAndNewModel() async throws {
+    var initialAgent = agent("a1", .claude)
+    initialAgent.model = "old-model"
+    let store = try makeStore(agents: [initialAgent], maxRounds: 1)
+    let firstAdapter = RecordingAdapter()
+    let firstRun = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: firstAdapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+    _ = try await firstRun.run()
+    #expect(try store.readAgentSession(agentID: "a1").sessionID == "session-a1")
+
+    var updatedAgents = try store.readConversation().agents
+    updatedAgents[0].model = "new-model"
+    try store.updateAgents(updatedAgents)
+
+    let secondAdapter = RecordingAdapter()
+    let secondRun = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: secondAdapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+    _ = try await secondRun.run(limit: .additionalRounds(1))
+
+    let request = try #require(await secondAdapter.requests.first)
+    #expect(request.agent.model == "new-model")
+    #expect(request.sessionID == nil)
+}
+
 @Test func queuedUserMessagesAreCommittedBeforeNextAgentTurn() async throws {
     let store = try makeStore(agents: [agent("a1", .claude)])
     let adapter = RecordingAdapter()

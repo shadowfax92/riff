@@ -3,11 +3,22 @@ import RiffCore
 import SwiftUI
 
 struct ConversationDetailsSheet: View {
+    @EnvironmentObject private var model: AppModel
     let conversation: Conversation
     let basePromptURL: URL
     let conversationURL: URL?
     let onClose: () -> Void
     @State private var copied = false
+    @State private var isContinuing = false
+    @State private var roleDrafts: [RoleDraft]
+
+    init(conversation: Conversation, basePromptURL: URL, conversationURL: URL?, onClose: @escaping () -> Void) {
+        self.conversation = conversation
+        self.basePromptURL = basePromptURL
+        self.conversationURL = conversationURL
+        self.onClose = onClose
+        _roleDrafts = State(initialValue: conversation.agents.map { RoleDraft(agent: $0) })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -33,6 +44,9 @@ struct ConversationDetailsSheet: View {
                     supportFoldersSection
                     conversationFolderRow
                     basePromptRow
+                    if let runtimeSettingsMessage {
+                        runtimeSettingsPrompt(message: runtimeSettingsMessage)
+                    }
                     rolesSection
                 }
                 .padding(.bottom, 4)
@@ -43,6 +57,21 @@ struct ConversationDetailsSheet: View {
 
             HStack {
                 Spacer()
+                Button {
+                    Task {
+                        isContinuing = true
+                        let didContinue = await model.continueSelectedConversation(roleDrafts: roleDrafts)
+                        isContinuing = false
+                        if didContinue {
+                            onClose()
+                        }
+                    }
+                } label: {
+                    Label(isContinuing ? "Continuing" : "Continue", systemImage: "play.fill")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canContinue)
                 Button("Close") {
                     onClose()
                 }
@@ -59,6 +88,31 @@ struct ConversationDetailsSheet: View {
                 .foregroundStyle(.secondary)
             content()
         }
+    }
+
+    private func runtimeSettingsPrompt(message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .font(.system(size: 14, weight: .semibold))
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(message)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary)
+                Text("Open Settings and set the missing executable path, then refresh runtimes.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Theme.Color.surfaceOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.surfaceStroke)
+        )
     }
 
     private func staticField(_ value: String) -> some View {
@@ -207,10 +261,34 @@ struct ConversationDetailsSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Roles")
                 .font(.system(size: 13, weight: .semibold))
-            ForEach(conversation.agents) { agent in
-                RoleDetailsRow(agent: agent)
+            ForEach($roleDrafts) { $role in
+                RoleDetailsRow(role: $role, editable: !isConversationRunning)
             }
         }
+    }
+
+    private var canContinue: Bool {
+        !isContinuing
+            && !isConversationRunning
+            && !roleDrafts.isEmpty
+            && runtimeSettingsMessage == nil
+    }
+
+    private var isConversationRunning: Bool {
+        model.isConversationRunning(conversation.id)
+    }
+
+    private var runtimeSettingsMessage: String? {
+        let agents = roleDrafts
+            .enumerated()
+            .map { offset, draft in draft.agentProfile(index: offset + 1) }
+        return RuntimeRequirement.settingsMessage(
+            for: RuntimeRequirement.missingRuntimes(
+                agents: agents,
+                detectedRuntimes: model.detectedRuntimes
+            ),
+            action: "continuing this Riff"
+        )
     }
 
     private func displayPath(_ url: URL) -> String {
@@ -224,18 +302,20 @@ struct ConversationDetailsSheet: View {
 }
 
 private struct RoleDetailsRow: View {
-    let agent: AgentProfile
+    @EnvironmentObject private var model: AppModel
+    @Binding var role: RoleDraft
+    let editable: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 AgentAvatar(
-                    initials: AgentAvatar.initials(from: agent.name.isEmpty ? "?" : agent.name),
-                    emoji: agent.emoji,
-                    color: Theme.color(for: agent),
+                    initials: AgentAvatar.initials(from: role.agentName.isEmpty ? "?" : role.agentName),
+                    emoji: role.emoji,
+                    color: Theme.color(forSpeakerID: role.id, runtime: role.runtime),
                     size: 28
                 )
-                Text(agent.name.isEmpty ? agent.role : agent.name)
+                Text(role.agentName.isEmpty ? "Unnamed Agent" : role.agentName)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -247,29 +327,39 @@ private struct RoleDetailsRow: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(Theme.Color.surfaceStroke)
                     )
-                Picker("", selection: .constant(agent.runtime)) {
-                    ForEach(RuntimeID.allCases) { runtime in
-                        Text(runtime.rawValue.capitalized).tag(runtime)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-                .labelsHidden()
-                .disabled(true)
+                runtimePicker
             }
 
             HStack(spacing: 10) {
-                fieldWithLabel("Model", value: displayModel)
-                fieldWithLabel("Reasoning", value: displayReasoning)
+                fieldWithLabel("Model") {
+                    Picker("", selection: modelBinding) {
+                        ForEach(modelOptions, id: \.id) { option in
+                            Text(option.label).tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .disabled(!editable)
+                }
+                fieldWithLabel("Reasoning") {
+                    Picker("", selection: reasoningBinding) {
+                        ForEach(reasoningOptions, id: \.id) { option in
+                            Text(option.label).tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .disabled(!editable)
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Role prompt")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text(agent.instructions.isEmpty ? "No role prompt saved." : agent.instructions)
+                Text(role.rolePrompt.isEmpty ? "No role prompt saved." : role.rolePrompt)
                     .font(.system(size: 12))
-                    .foregroundStyle(agent.instructions.isEmpty ? .secondary : .primary)
+                    .foregroundStyle(role.rolePrompt.isEmpty ? .secondary : .primary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading)
                     .padding(.horizontal, 8)
@@ -291,18 +381,33 @@ private struct RoleDetailsRow: View {
         )
     }
 
-    private func fieldWithLabel(_ label: String, value: String) -> some View {
+    private var runtimePicker: some View {
+        Picker("", selection: $role.runtime) {
+            ForEach(RuntimeID.allCases) { runtime in
+                Text(runtime.rawValue.capitalized).tag(runtime)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 160)
+        .labelsHidden()
+        .disabled(!editable)
+        .onChange(of: role.runtime) { _, newRuntime in
+            role.model = "default"
+            if let reasoning = role.reasoning,
+               !reasoningOptions(for: newRuntime).contains(where: { $0.id == reasoning }) {
+                role.reasoning = nil
+            }
+        }
+    }
+
+    private func fieldWithLabel<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            content()
                 .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .padding(.vertical, 1)
                 .background(Theme.Color.surfaceOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
@@ -312,18 +417,51 @@ private struct RoleDetailsRow: View {
         }
     }
 
-    private var displayModel: String {
-        agent.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || agent.model == "default"
-            ? "Default (CLI config)"
-            : agent.model
+    private var modelOptions: [RuntimeModelOption] {
+        var options = if let detected = model.detectedRuntimes[role.runtime]?.models, !detected.isEmpty {
+            detected
+        } else {
+            RuntimeDefinitions.definition(for: role.runtime).fallbackModels
+        }
+        let current = role.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !current.isEmpty,
+           current != "default",
+           !options.contains(where: { $0.id == current }) {
+            options.append(RuntimeModelOption(id: current, label: current))
+        }
+        return options
     }
 
-    private var displayReasoning: String {
-        guard let reasoning = agent.reasoning?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !reasoning.isEmpty,
-              reasoning != "default" else {
-            return "Default (CLI config)"
+    private var modelBinding: Binding<String> {
+        Binding {
+            let current = role.model.trimmingCharacters(in: .whitespacesAndNewlines)
+            return current.isEmpty ? "default" : current
+        } set: { value in
+            role.model = value
         }
-        return reasoning.capitalized
+    }
+
+    private var reasoningOptions: [RuntimeReasoningOption] {
+        var options = reasoningOptions(for: role.runtime)
+        if let current = role.reasoning?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !current.isEmpty,
+           current != "default",
+           !options.contains(where: { $0.id == current }) {
+            options.append(RuntimeReasoningOption(id: current, label: current.capitalized))
+        }
+        return options
+    }
+
+    private var reasoningBinding: Binding<String> {
+        Binding {
+            let current = role.reasoning?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return current.isEmpty ? "default" : current
+        } set: { value in
+            role.reasoning = value == "default" ? nil : value
+        }
+    }
+
+    private func reasoningOptions(for runtime: RuntimeID) -> [RuntimeReasoningOption] {
+        RuntimeDefinitions.reasoningOptions(for: runtime)
     }
 }

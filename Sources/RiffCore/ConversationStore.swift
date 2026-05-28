@@ -42,8 +42,7 @@ public struct ConversationStore: Sendable {
         try FileManager.default.createDirectory(at: filesURL, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: agentsURL, withIntermediateDirectories: true)
         for agent in conversation.agents {
-            try FileManager.default.createDirectory(at: agentCWD(agentID: agent.id), withIntermediateDirectories: true)
-            try RiffJSON.write(agent, to: agentDirectory(agentID: agent.id).appending(path: "agent.json"))
+            try writeAgentSnapshot(agent)
         }
         if !FileManager.default.fileExists(atPath: transcriptURL.path) {
             FileManager.default.createFile(atPath: transcriptURL.path, contents: Data())
@@ -57,6 +56,24 @@ public struct ConversationStore: Sendable {
 
     public func updateConversation(_ conversation: Conversation) throws {
         try RiffJSON.write(conversation, to: conversationURL)
+    }
+
+    public func writeAgentSnapshot(_ agent: AgentProfile) throws {
+        try FileManager.default.createDirectory(at: agentCWD(agentID: agent.id), withIntermediateDirectories: true)
+        try RiffJSON.write(agent, to: agentDirectory(agentID: agent.id).appending(path: "agent.json"))
+    }
+
+    public func updateAgents(_ agents: [AgentProfile]) throws {
+        var conversation = try readConversation()
+        let oldAgents = Dictionary(uniqueKeysWithValues: conversation.agents.map { ($0.id, $0) })
+        conversation.agents = agents
+        try updateConversation(conversation)
+        for agent in agents {
+            try writeAgentSnapshot(agent)
+            if let oldAgent = oldAgents[agent.id], runtimeSettingsChanged(from: oldAgent, to: agent) {
+                try writeAgentSession(AgentSession(), agentID: agent.id)
+            }
+        }
     }
 
     /// Deletes the whole conversation root. App code moves folders to Trash
@@ -76,6 +93,12 @@ public struct ConversationStore: Sendable {
         } else {
             try fm.removeItem(at: rootURL)
         }
+    }
+
+    private func runtimeSettingsChanged(from oldAgent: AgentProfile, to newAgent: AgentProfile) -> Bool {
+        oldAgent.runtime != newAgent.runtime
+            || oldAgent.model != newAgent.model
+            || oldAgent.reasoning != newAgent.reasoning
     }
 
     public func appendTranscript(_ entry: TranscriptEntry) throws {
