@@ -60,11 +60,7 @@ struct NewConversationSheet: View {
                         }
                     }
 
-                    HStack(spacing: 14) {
-                        Stepper("Rounds: \(maxRounds)", value: $maxRounds, in: 1...12)
-                            .controlSize(.small)
-                        Spacer()
-                    }
+                    roundsEditor
 
                     folderRow
 
@@ -252,6 +248,45 @@ struct NewConversationSheet: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Theme.Color.surfaceStroke)
         )
+    }
+
+    private var roundsEditor: some View {
+        fieldGroup(label: "Rounds") {
+            HStack(spacing: 8) {
+                TextField("10", value: roundsBinding, format: .number)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 56)
+                    .multilineTextAlignment(.trailing)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(Theme.Color.surfaceOverlay)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Theme.Color.surfaceStroke)
+                    )
+                Stepper {
+                    Text("rounds")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                } onIncrement: {
+                    maxRounds += 1
+                } onDecrement: {
+                    maxRounds = RoundCount.normalized(maxRounds - 1)
+                }
+                .controlSize(.small)
+                Spacer()
+            }
+        }
+    }
+
+    private var roundsBinding: Binding<Int> {
+        Binding {
+            maxRounds
+        } set: { value in
+            maxRounds = RoundCount.normalized(value)
+        }
     }
 
     private var rolesSection: some View {
