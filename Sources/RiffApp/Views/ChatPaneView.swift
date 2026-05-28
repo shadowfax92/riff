@@ -28,6 +28,7 @@ struct ChatPaneView: View {
                 ) {
                     showingDetails = false
                 }
+                .environmentObject(model)
             }
         }
         .sheet(item: $forkSeed) { seed in

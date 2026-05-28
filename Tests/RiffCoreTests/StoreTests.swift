@@ -170,6 +170,30 @@ import Testing
     #expect(saved.agents == conversation.agents)
 }
 
+@Test func updatingConversationAgentsPersistsSnapshotsAndResetsChangedSessions() throws {
+    let root = try temporaryDirectory().appending(path: "conversation", directoryHint: .isDirectory)
+    let store = ConversationStore(rootURL: root)
+    try store.create(sampleConversation())
+    try store.writeAgentSession(
+        AgentSession(sessionID: "existing-session", model: "old-model"),
+        agentID: "a1"
+    )
+
+    var updatedAgents = try store.readConversation().agents
+    updatedAgents[0].model = "new-model"
+    try store.updateAgents(updatedAgents)
+
+    #expect(try store.readConversation().agents[0].model == "new-model")
+    let savedSnapshot = try RiffJSON.read(
+        AgentProfile.self,
+        from: store.agentDirectory(agentID: "a1").appending(path: "agent.json")
+    )
+    #expect(savedSnapshot.model == "new-model")
+    let session = try store.readAgentSession(agentID: "a1")
+    #expect(session.sessionID == nil)
+    #expect(session.model == "default")
+}
+
 @Test func conversationDecodesLegacyJSONWithoutSupportFolders() throws {
     let data = Data("""
     {
