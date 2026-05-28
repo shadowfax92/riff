@@ -6,6 +6,12 @@ public enum DebateOrchestratorError: Error, Equatable {
     case emptySummary
 }
 
+public enum DebateRunLimit: Equatable, Sendable {
+    case configuredRounds
+    case additionalRounds(Int)
+    case unbounded
+}
+
 extension DebateOrchestratorError: CustomStringConvertible {
     public var description: String {
         switch self {
@@ -125,7 +131,7 @@ public actor DebateOrchestrator {
     /// Runs the conversation turn loop until all configured rounds complete
     /// or a stop request lands; stop never interrupts an in-flight CLI turn.
     @discardableResult
-    public func run() async throws -> [TranscriptEntry] {
+    public func run(limit: DebateRunLimit = .configuredRounds) async throws -> [TranscriptEntry] {
         shouldStop = false
 
         var conversation = try store.readConversation()
@@ -143,7 +149,11 @@ public actor DebateOrchestrator {
 
         var transcript = try store.readTranscript()
         var agentTurns = transcript.filter { $0.speakerID != "user" }.count
-        let maxAgentTurns = conversation.maxRounds * conversation.agents.count
+        let maxAgentTurns = targetAgentTurns(
+            conversation: conversation,
+            currentAgentTurns: agentTurns,
+            limit: limit
+        )
         while agentTurns < maxAgentTurns {
             for text in drainQueuedUserMessages() {
                 let entry = userEntry(text: text, turn: transcript.count + 1)
@@ -238,6 +248,21 @@ public actor DebateOrchestrator {
             agentTurns += 1
         }
         return transcript
+    }
+
+    private func targetAgentTurns(
+        conversation: Conversation,
+        currentAgentTurns: Int,
+        limit: DebateRunLimit
+    ) -> Int {
+        switch limit {
+        case .configuredRounds:
+            return conversation.maxRounds * conversation.agents.count
+        case .additionalRounds(let rounds):
+            return currentAgentTurns + max(1, rounds) * conversation.agents.count
+        case .unbounded:
+            return Int.max
+        }
     }
 
     private func drainQueuedUserMessages() -> [String] {

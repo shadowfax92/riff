@@ -18,6 +18,70 @@ import Testing
     #expect(try store.readTranscript().map(\.speakerID) == ["a1", "a2"])
 }
 
+@Test func configuredRunDoesNotAppendTurnsAfterConfiguredRoundsAreComplete() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)], maxRounds: 1)
+    try store.appendTranscript(transcriptEntry(turn: 1, speakerID: "a1", speakerName: "Agent a1", text: "done a1"))
+    try store.appendTranscript(transcriptEntry(turn: 2, speakerID: "a2", speakerName: "Agent a2", text: "done a2"))
+    let adapter = RecordingAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    _ = try await orchestrator.run()
+
+    #expect(try store.readTranscript().map(\.speakerID) == ["a1", "a2"])
+    #expect(await adapter.requests.isEmpty)
+}
+
+@Test func additionalRoundRunAppendsOneFullRoundAfterConfiguredRoundsAreComplete() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)], maxRounds: 1)
+    try store.appendTranscript(transcriptEntry(turn: 1, speakerID: "a1", speakerName: "Agent a1", text: "done a1"))
+    try store.appendTranscript(transcriptEntry(turn: 2, speakerID: "a2", speakerName: "Agent a2", text: "done a2"))
+    let adapter = RecordingAdapter()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock()
+    )
+
+    _ = try await orchestrator.run(limit: .additionalRounds(1))
+
+    let transcript = try store.readTranscript()
+    #expect(transcript.map(\.speakerID) == ["a1", "a2", "a1", "a2"])
+    #expect(transcript.suffix(2).map(\.round) == [2, 2])
+    #expect(await adapter.requests.count == 2)
+}
+
+@Test func unboundedRunContinuesAfterConfiguredRoundsUntilStopped() async throws {
+    let store = try makeStore(agents: [agent("a1", .claude), agent("a2", .claude)], maxRounds: 1)
+    try store.appendTranscript(transcriptEntry(turn: 1, speakerID: "a1", speakerName: "Agent a1", text: "done a1"))
+    try store.appendTranscript(transcriptEntry(turn: 2, speakerID: "a2", speakerName: "Agent a2", text: "done a2"))
+    let adapter = RecordingAdapter()
+    let stopController = StopController()
+    let orchestrator = DebateOrchestrator(
+        store: store,
+        adapters: [.claude: adapter],
+        baselinePrompt: "base",
+        now: fixedClock(),
+        onTranscriptChange: {
+            if ((try? store.readTranscript().count) ?? 0) >= 5 {
+                await stopController.stop()
+            }
+        }
+    )
+    await stopController.set(orchestrator)
+
+    _ = try await orchestrator.run(limit: .unbounded)
+
+    let transcript = try store.readTranscript()
+    #expect(transcript.map(\.speakerID) == ["a1", "a2", "a1", "a2", "a1"])
+    #expect(await adapter.requests.count == 3)
+}
+
 @Test func queuedUserMessagesAreCommittedBeforeNextAgentTurn() async throws {
     let store = try makeStore(agents: [agent("a1", .claude)])
     let adapter = RecordingAdapter()
@@ -308,6 +372,18 @@ private actor TranscriptChangeRecorder {
 
     func record(_ count: Int) {
         counts.append(count)
+    }
+}
+
+private actor StopController {
+    private var orchestrator: DebateOrchestrator?
+
+    func set(_ orchestrator: DebateOrchestrator) {
+        self.orchestrator = orchestrator
+    }
+
+    func stop() async {
+        await orchestrator?.stop()
     }
 }
 

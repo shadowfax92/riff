@@ -13,6 +13,10 @@ struct UIOnlySummaryStore {
         summaries[conversationID] = nil
     }
 
+    func contains(conversationID: String) -> Bool {
+        summaries[conversationID] != nil
+    }
+
     /// Returns the disk transcript with the latest UI-only summary appended
     /// as the final visible entry for that conversation.
     func merged(with diskTranscript: [TranscriptEntry], conversationID: String) -> [TranscriptEntry] {
