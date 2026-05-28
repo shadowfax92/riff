@@ -8,6 +8,7 @@ struct MarkdownFileReaderView: View {
     let mode: Mode
     let onDock: (() -> Void)?
     let onClose: () -> Void
+    @State private var copied = false
 
     enum Mode {
         case sidebar
@@ -21,6 +22,7 @@ struct MarkdownFileReaderView: View {
             ScrollView {
                 Markdown(markdown)
                     .markdownTheme(.gitHub)
+                    .textSelection(.enabled)
                     .padding(16)
             }
         }
@@ -34,6 +36,16 @@ struct MarkdownFileReaderView: View {
             Text(file.name)
                 .font(.system(size: 12, weight: .medium))
             Spacer()
+            Button {
+                MarkdownClipboard.copy(markdown)
+                showCopied()
+            } label: {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(copied ? "Copied" : "Copy Markdown")
             if let onDock {
                 Button(action: onDock) {
                     Image(systemName: mode == .sidebar ? "arrow.up.right.square" : "sidebar.right")
@@ -53,5 +65,12 @@ struct MarkdownFileReaderView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    private func showCopied() {
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copied = false
+        }
     }
 }
