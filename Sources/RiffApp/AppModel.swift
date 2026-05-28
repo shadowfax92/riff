@@ -17,6 +17,11 @@ struct PendingSteer: Equatable {
     var latestText: String { messages.last ?? "" }
 }
 
+private struct ConversationRunConfiguration {
+    var limit: DebateRunLimit
+    var automaticallySummarizeOnCompletion: Bool
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var rows: [ConversationRow] = []
@@ -203,8 +208,16 @@ final class AppModel: ObservableObject {
                 queueSteerMessage(trimmed)
                 return
             }
+            let runConfiguration = runConfiguration(
+                for: location,
+                completedLimit: .additionalRounds(1)
+            )
             try appendUserMessages([trimmed], to: location)
-            startConversation(at: location)
+            startConversation(
+                at: location,
+                limit: runConfiguration.limit,
+                automaticallySummarizeOnCompletion: runConfiguration.automaticallySummarizeOnCompletion
+            )
         } catch {
             errorMessage = String(describing: error)
         }
@@ -228,9 +241,17 @@ final class AppModel: ObservableObject {
                     return
                 }
                 do {
+                    let runConfiguration = self.runConfiguration(
+                        for: location,
+                        completedLimit: .additionalRounds(1)
+                    )
                     try self.appendUserMessages(messages, to: location)
                     self.setApplyingSteer(false, conversationID: selectedID)
-                    self.startConversation(at: location)
+                    self.startConversation(
+                        at: location,
+                        limit: runConfiguration.limit,
+                        automaticallySummarizeOnCompletion: runConfiguration.automaticallySummarizeOnCompletion
+                    )
                 } catch {
                     self.setApplyingSteer(false, conversationID: selectedID)
                     self.errorMessage = String(describing: error)
@@ -238,8 +259,16 @@ final class AppModel: ObservableObject {
             }
         } else {
             do {
+                let runConfiguration = runConfiguration(
+                    for: location,
+                    completedLimit: .additionalRounds(1)
+                )
                 try appendUserMessages(messages, to: location)
-                startConversation(at: location)
+                startConversation(
+                    at: location,
+                    limit: runConfiguration.limit,
+                    automaticallySummarizeOnCompletion: runConfiguration.automaticallySummarizeOnCompletion
+                )
             } catch {
                 errorMessage = String(describing: error)
             }
@@ -259,13 +288,35 @@ final class AppModel: ObservableObject {
         guard let location = selectedLocation else {
             return
         }
-        startConversation(at: location)
+        let runConfiguration = runConfiguration(
+            for: location,
+            completedLimit: .unbounded
+        )
+        startConversation(
+            at: location,
+            limit: runConfiguration.limit,
+            automaticallySummarizeOnCompletion: runConfiguration.automaticallySummarizeOnCompletion
+        )
     }
 
-    private func startConversation(at location: ConversationLocation) {
+    func removeSelectedSummary() {
+        guard let selectedID, let location = selectedLocation else {
+            return
+        }
+        uiOnlySummaries.remove(for: selectedID)
+        reloadConversationFromDiskIfSelected(location)
+    }
+
+    private func startConversation(
+        at location: ConversationLocation,
+        limit: DebateRunLimit = .configuredRounds,
+        automaticallySummarizeOnCompletion: Bool = true
+    ) {
         guard !runRegistry.isRunning(conversationID: location.id) else {
             return
         }
+        uiOnlySummaries.remove(for: location.id)
+        reloadConversationFromDiskIfSelected(location)
         updateRunRegistry { $0.start(conversationID: location.id) }
         let store = ConversationStore(rootURL: location.url)
         let summaryPrompt = summaryPrompt
@@ -324,11 +375,11 @@ final class AppModel: ObservableObject {
             var completedNaturally = false
             var summaryEntry: TranscriptEntry?
             do {
-                let transcript = try await orchestrator.run()
+                let transcript = try await orchestrator.run(limit: limit)
                 if let conversation = try? store.readConversation() {
                     completedNaturally = self.didComplete(transcript: transcript, conversation: conversation)
                 }
-                if completedNaturally {
+                if completedNaturally && automaticallySummarizeOnCompletion {
                     summaryEntry = try await orchestrator.summarize(
                         summaryPrompt: summaryPrompt,
                         summaryAgent: summaryAgent
@@ -353,6 +404,23 @@ final class AppModel: ObservableObject {
                 try? self.reloadRows()
             }
         }
+    }
+
+    private func runConfiguration(
+        for location: ConversationLocation,
+        completedLimit: DebateRunLimit
+    ) -> ConversationRunConfiguration {
+        let hasCompletedConfiguredRounds = (try? hasReachedConfiguredRounds(at: location)) ?? false
+        if hasCompletedConfiguredRounds {
+            return ConversationRunConfiguration(
+                limit: completedLimit,
+                automaticallySummarizeOnCompletion: false
+            )
+        }
+        return ConversationRunConfiguration(
+            limit: .configuredRounds,
+            automaticallySummarizeOnCompletion: true
+        )
     }
 
     /// Runs the configured summary agent in a fresh CLI session for the
@@ -624,6 +692,13 @@ final class AppModel: ObservableObject {
     private func didComplete(transcript: [TranscriptEntry], conversation: Conversation) -> Bool {
         let agentTurns = transcript.filter { $0.speakerID != "user" }.count
         return agentTurns >= conversation.maxRounds * conversation.agents.count
+    }
+
+    private func hasReachedConfiguredRounds(at location: ConversationLocation) throws -> Bool {
+        let store = ConversationStore(rootURL: location.url)
+        let conversation = try store.readConversation()
+        let transcript = try store.readTranscript()
+        return didComplete(transcript: transcript, conversation: conversation)
     }
 
     private func reloadRows() throws {

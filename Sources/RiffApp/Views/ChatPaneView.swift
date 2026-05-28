@@ -424,10 +424,24 @@ private struct MessageRow: View {
     private var bubbleColumn: some View {
         VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
             if showHeader, !isUser {
-                Text(entry.speakerName)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
+                HStack(spacing: 6) {
+                    Text(entry.speakerName)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    if isSummary {
+                        Button {
+                            model.removeSelectedSummary()
+                        } label: {
+                            Label("Remove Summary", systemImage: "trash")
+                                .labelStyle(.iconOnly)
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .help("Remove summary")
+                    }
+                }
+                .padding(.horizontal, 12)
             }
             bubble
             if let wordCount = wordCountLabel {

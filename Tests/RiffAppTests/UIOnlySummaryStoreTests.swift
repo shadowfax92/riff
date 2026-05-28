@@ -35,6 +35,22 @@ import Testing
     #expect(display.map(\.text) == ["question", "new"])
 }
 
+@Test func summaryStoreRemovesSummaryForConversation() {
+    var store = UIOnlySummaryStore()
+
+    store.set(entry(turn: 2, speakerID: "summary", text: "summary"), for: "c1")
+    #expect(store.contains(conversationID: "c1"))
+
+    store.remove(for: "c1")
+    let display = store.merged(
+        with: [entry(turn: 1, speakerID: "agent", text: "reply")],
+        conversationID: "c1"
+    )
+
+    #expect(!store.contains(conversationID: "c1"))
+    #expect(display.map(\.text) == ["reply"])
+}
+
 private func entry(turn: Int, speakerID: String, text: String) -> TranscriptEntry {
     TranscriptEntry(
         id: "t\(turn)-\(speakerID)",
