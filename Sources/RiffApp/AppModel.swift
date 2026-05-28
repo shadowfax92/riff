@@ -137,6 +137,25 @@ final class AppModel: ObservableObject {
         await reloadSelected()
     }
 
+    @discardableResult
+    func selectConversation(id: String) async -> Bool {
+        if let row = rows.first(where: { $0.id == id }) {
+            await select(row)
+            return true
+        }
+        do {
+            try reloadRows()
+        } catch {
+            errorMessage = String(describing: error)
+            return false
+        }
+        guard let row = rows.first(where: { $0.id == id }) else {
+            return false
+        }
+        await select(row)
+        return true
+    }
+
     /// Creates a file-backed conversation under Riff's conversation root and
     /// records user-selected support folders that agents may read during turns.
     func createConversation(title: String, prompt: String, maxRounds: Int, supportFolders: [URL], roleDrafts: [RoleDraft]) async -> Bool {

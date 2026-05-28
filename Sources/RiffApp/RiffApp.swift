@@ -2,23 +2,16 @@ import SwiftUI
 
 @main
 struct RiffApp: App {
-    @StateObject private var model = AppModel()
-    @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("riff.appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
-
     var body: some Scene {
         WindowGroup("Riff") {
-            RootView()
-                .environmentObject(model)
-                .task { await model.bootstrap() }
-                .onChange(of: scenePhase) {
-                    guard scenePhase == .active else {
-                        return
-                    }
-                    Task { await model.refreshRowsFromDisk() }
-                }
-                .frame(minWidth: 1100, minHeight: 700)
-                .preferredColorScheme(appearance.colorScheme)
+            RiffWindowRoot(initialConversationID: nil)
+        }
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
+        .defaultSize(width: 1280, height: 800)
+
+        WindowGroup("Riff Chat", for: ConversationWindowRoute.self) { route in
+            RiffWindowRoot(initialConversationID: route.wrappedValue?.conversationID)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -31,10 +24,6 @@ struct RiffApp: App {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
-    }
-
-    private var appearance: AppearanceMode {
-        AppearanceMode(rawValue: appearanceRaw) ?? .system
     }
 }
 

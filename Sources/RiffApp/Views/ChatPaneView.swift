@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ChatPaneView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.openWindow) private var openWindow
     @State private var draft = ""
     @State private var lastTranscriptCount = 0
     @State private var showingDetails = false
@@ -95,6 +96,19 @@ struct ChatPaneView: View {
                 .controlSize(.small)
                 .disabled(model.selectedConversation == nil || model.isSelectedConversationSummarizing)
             }
+
+            Button {
+                if let conversation = model.selectedConversation {
+                    openWindow(value: ConversationWindowRoute(conversationID: conversation.id))
+                }
+            } label: {
+                Label("Window", systemImage: "macwindow.badge.plus")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(model.selectedConversation == nil)
+            .help("Open this chat in a new window")
 
             Button {
                 forkSeed = model.selectedConversation

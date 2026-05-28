@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.openWindow) private var openWindow
     @Binding var showingNewConversation: Bool
     @State private var search = ""
     @State private var pendingDelete: ConversationRow?
@@ -120,6 +121,11 @@ struct SidebarView: View {
                             Task { await model.select(row) }
                         }
                         .contextMenu {
+                            Button {
+                                openWindow(value: ConversationWindowRoute(conversationID: row.id))
+                            } label: {
+                                Label("Open in New Window", systemImage: "macwindow.badge.plus")
+                            }
                             Button(role: .destructive) {
                                 pendingDelete = row
                             } label: {
